@@ -21,14 +21,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Installs prek; the default extra-args (--all-files) find no config here,
-      # so the tests below are what actually exercise the hooks.
-      - uses: j178/prek-action@af4d4fcb6922b8e6f65c0426947125fcc38794ce # v3.0.2
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          prek-version: "0.5.6"
-          extra-args: --version
-      - name: Fixture tests
-        run: tests/run.sh
+          go-version-file: go.mod
+      - name: Install Task (version pinned in Taskfile.yml)
+        run: |
+          version="$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
+          go install "github.com/go-task/task/v3/cmd/task@v${version}"
+      - run: task check
 
   # Single required check (the shared default-branch ruleset requires a passing
   # workflow-summary).

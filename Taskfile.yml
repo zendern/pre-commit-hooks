@@ -1,0 +1,41 @@
+# https://taskfile.dev
+version: "3"
+
+vars:
+  # The one source for the Task version CI installs (.github/workflows/ci.yml).
+  TASK_VERSION: 3.54.0
+
+tasks:
+  default:
+    cmds:
+      - task: check
+
+  check:
+    desc: Everything CI runs
+    cmds:
+      - task: fmt-check
+      - task: vet
+      - task: test
+      - task: dogfood
+
+  fmt-check:
+    desc: Fail if any Go file needs gofmt
+    cmds:
+      - |
+        out="$(gofmt -l .)"
+        if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
+
+  vet:
+    desc: go vet
+    cmds:
+      - go vet ./...
+
+  test:
+    desc: go test
+    cmds:
+      - go test ./...
+
+  dogfood:
+    desc: Run the hooks against this repo's own workflows
+    cmds:
+      - go run ./cmd/no-latest-runners .github/workflows/*.yml

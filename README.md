@@ -20,27 +20,32 @@ repos:
 Freeze `rev` to a commit SHA (`prek autoupdate --freeze` or
 `pre-commit autoupdate --freeze`); Renovate's pre-commit manager bumps it.
 
+The hooks are Go programs (`language: golang`). pre-commit and prek build them
+with `go install` on first use, and download a Go toolchain if none is
+installed.
+
 ## Hooks
 
 ### `no-latest-runners`
 
-Fails when a workflow or composite action under `.github/` uses a floating
-runner label such as `ubuntu-latest`, `macos-latest` or `windows-latest`.
-GitHub repoints those labels to new images (`ubuntu-latest` moved to Ubuntu 26
-from 2026-10-19), so an unpinned job changes OS without a commit. Pin a version
-instead: `ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
+Fails when a workflow job runs on a floating runner label such as
+`ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
+labels to new images (`ubuntu-latest` moved to Ubuntu 26 from 2026-10-19), so
+an unpinned job changes OS without a commit. Pin a version instead:
+`ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
 
-It's one `pygrep` regex (multiline) starting at each `runs-on:` and covering
-every form: a scalar (`runs-on: ubuntu-latest`), a flow list
-(`[self-hosted, ubuntu-latest]`), a block list on the following lines, and a
-`group`/`labels` object. It only walks the lines that belong to `runs-on`, so
-text later in the job (`- run: echo ubuntu-latest`) doesn't match, and comments
-are skipped. Labels chosen through an expression (`runs-on: ${{ matrix.os }}`)
-can't be resolved and aren't checked.
+It parses each workflow and reads `jobs.<id>.runs-on` in every form: a label, a
+list of labels, or a `group`/`labels` object. Labels set through an expression
+(`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
 
-### Exclusions
+```
+.github/workflows/ci.yml:12: job "build" runs on "ubuntu-latest"
+```
 
-- One line: end it with `# no-latest-runners: allow`.
+#### Exclusions
+
+- One job: put `# no-latest-runners: allow` on its `runs-on` line (or on a
+  list item's line).
 
   ```yaml
   runs-on: ubuntu-latest # no-latest-runners: allow
@@ -56,6 +61,9 @@ can't be resolved and aren't checked.
 
 ## Development
 
+With [Task](https://taskfile.dev):
+
 ```sh
-tests/run.sh   # runs each hook via `prek try-repo`: tests/fixtures/bad-* must fail, good-* must pass
+task check   # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
+task test    # tests only
 ```
