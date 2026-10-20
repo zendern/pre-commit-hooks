@@ -18,3 +18,5 @@ jobs:
   e:
     container: node:latest-alpine
     runs-on: ubuntu-24.04
+  f:
+    runs-on: ubuntu-24.04 # was ubuntu-latest

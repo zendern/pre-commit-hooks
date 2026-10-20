@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
-# Every fixture named bad-* must fail the hook and every good-* must pass.
-set -euo pipefail
+# Runs the hook the way a consumer repo does (prek try-repo): each
+# tests/fixtures/bad-* workflow must fail it, each good-* must pass.
+set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-hook="$root/hooks/no-latest-runners.sh"
-failures=0
+rc=0
 
-for f in "$root"/tests/fixtures/*.yml; do
-  name="$(basename "$f")"
-  if "$hook" "$f" >/dev/null 2>&1; then got=pass; else got=fail; fi
-  case "$name" in
-    bad-*) want=fail ;;
-    good-*) want=pass ;;
-    *) echo "unexpected fixture name: $name" >&2; exit 2 ;;
-  esac
-  if [[ "$got" == "$want" ]]; then
-    echo "ok   $name ($got)"
+for fixture in "$root"/tests/fixtures/*.yml; do
+  name="$(basename "$fixture")"
+  repo="$(mktemp -d "${TMPDIR:-/tmp}/hook-test.XXXXXX")"
+  mkdir -p "$repo/.github/workflows"
+  cp "$fixture" "$repo/.github/workflows/ci.yml"
+  git -C "$repo" init -q
+  git -C "$repo" add -A # --all-files only sees tracked files
+
+  if prek try-repo "$root" no-latest-runners --all-files --cd "$repo" >/dev/null 2>&1; then
+    result=pass
   else
-    echo "FAIL $name: wanted $want, got $got"
-    failures=$((failures + 1))
+    result=fail
   fi
+  [[ "$name" == bad-* ]] && want=fail || want=pass
+
+  if [[ "$result" == "$want" ]]; then echo "ok   $name"; else echo "FAIL $name: wanted $want"; rc=1; fi
+  rm -rf "$repo"
 done
 
-exit "$failures"
+exit "$rc"

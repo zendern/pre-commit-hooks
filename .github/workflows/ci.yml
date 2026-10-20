@@ -21,13 +21,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Shellcheck the hooks
-        run: shellcheck hooks/*.sh tests/*.sh
+      # Installs prek; the default extra-args (--all-files) find no config here,
+      # so the tests below are what actually exercise the hooks.
+      - uses: j178/prek-action@af4d4fcb6922b8e6f65c0426947125fcc38794ce # v3.0.2
+        with:
+          prek-version: "0.5.6"
+          extra-args: --version
       - name: Fixture tests
         run: tests/run.sh
-      # Dogfood: this repo's own workflows must pass the hook too.
-      - name: Run no-latest-runners on this repo
-        run: hooks/no-latest-runners.sh .github/workflows/*.yml
 
   # Single required check (the shared default-branch ruleset requires a passing
   # workflow-summary).

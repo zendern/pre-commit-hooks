@@ -1,6 +1,7 @@
 - id: no-latest-runners
   name: pin runners (no *-latest)
-  description: Fail when a workflow or action uses a floating runner label such as ubuntu-latest.
-  entry: hooks/no-latest-runners.sh
-  language: script
+  description: Pin GitHub Actions runner labels to a version (e.g. ubuntu-24.04) instead of *-latest.
+  # A runs-on line whose value (before any comment) ends a label in -latest.
+  entry: '^\s*runs-on:[^#\n]*-latest\b'
+  language: pygrep
   files: ^\.github/(workflows|actions)/.*\.ya?ml$
