@@ -1,0 +1,6 @@
+- id: no-latest-runners
+  name: pin runners (no *-latest)
+  description: Fail when a workflow or action uses a floating runner label such as ubuntu-latest.
+  entry: hooks/no-latest-runners.sh
+  language: script
+  files: ^\.github/(workflows|actions)/.*\.ya?ml$
