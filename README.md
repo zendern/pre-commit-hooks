@@ -1,5 +1,8 @@
 # pre-commit-hooks
 
+[![ci](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go_1.26-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Shared [pre-commit](https://pre-commit.com) hooks for zendern's repositories.
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
 pre-commit or [prek](https://prek.j178.dev) alike. Public, so CI (and public
