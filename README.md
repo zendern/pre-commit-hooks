@@ -1,21 +1,24 @@
-# prek-hooks
+# pre-commit-hooks
 
-Shared [prek](https://prek.j178.dev) / [pre-commit](https://pre-commit.com)
-hooks for zendern's repositories. Public, so CI (and public repos) can fetch it
-without credentials.
+Shared [pre-commit](https://pre-commit.com) hooks for zendern's repositories.
+They use the standard `.pre-commit-hooks.yaml` format, so they run under
+pre-commit or [prek](https://prek.j178.dev) alike. Public, so CI (and public
+repos) can fetch them without credentials.
 
 ## Usage
 
+In `.pre-commit-config.yaml`:
+
 ```yaml
 repos:
-  - repo: https://github.com/zendern/prek-hooks
+  - repo: https://github.com/zendern/pre-commit-hooks
     rev: <full commit sha>  # frozen: v1.0.0
     hooks:
       - id: no-latest-runners
 ```
 
-Freeze `rev` to a commit SHA (`prek autoupdate --freeze`); Renovate's
-pre-commit manager bumps it.
+Freeze `rev` to a commit SHA (`prek autoupdate --freeze` or
+`pre-commit autoupdate --freeze`); Renovate's pre-commit manager bumps it.
 
 ## Hooks
 
