@@ -30,11 +30,29 @@ GitHub repoints those labels to new images (`ubuntu-latest` moved to Ubuntu 26
 from 2026-10-19), so an unpinned job changes OS without a commit. Pin a version
 instead: `ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
 
-It's a single `pygrep` regex over `runs-on:` lines, so it catches the scalar
-(`runs-on: ubuntu-latest`) and flow-list (`runs-on: [self-hosted,
-ubuntu-latest]`) forms and ignores comments. Not checked: a block list or
-`labels:` on the lines after `runs-on:`, and labels chosen through an
-expression (`runs-on: ${{ matrix.os }}`).
+It's one `pygrep` regex (multiline) starting at each `runs-on:` and covering
+every form: a scalar (`runs-on: ubuntu-latest`), a flow list
+(`[self-hosted, ubuntu-latest]`), a block list on the following lines, and a
+`group`/`labels` object. It only walks the lines that belong to `runs-on`, so
+text later in the job (`- run: echo ubuntu-latest`) doesn't match, and comments
+are skipped. Labels chosen through an expression (`runs-on: ${{ matrix.os }}`)
+can't be resolved and aren't checked.
+
+### Exclusions
+
+- One line: end it with `# no-latest-runners: allow`.
+
+  ```yaml
+  runs-on: ubuntu-latest # no-latest-runners: allow
+  ```
+
+- Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
+
+  ```yaml
+      hooks:
+        - id: no-latest-runners
+          exclude: ^\.github/workflows/experimental\.yml$
+  ```
 
 ## Development
 

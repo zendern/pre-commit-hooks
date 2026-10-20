@@ -1,7 +1,14 @@
 - id: no-latest-runners
   name: pin runners (no *-latest)
   description: Pin GitHub Actions runner labels to a version (e.g. ubuntu-24.04) instead of *-latest.
-  # A runs-on line whose value (before any comment) ends a label in -latest.
-  entry: '^\s*runs-on:[^#\n]*-latest\b'
+  # Matched against the whole file (--multiline). From a `runs-on:` line, one of:
+  #   1. the label is on that line:            runs-on: ubuntu-latest / [a, ubuntu-latest]
+  #   2. a block list follows; walk its `- x` items until one ends in -latest
+  #   3. a group/labels object follows; walk those keys to a -latest `labels:` value
+  # Walking only over list items (2) or group/labels keys (3) stops at the first
+  # other line (e.g. `steps:`), so text later in the job can't match. Comments
+  # are skipped, and a line ending in `# no-latest-runners: allow` is exempt.
+  entry: '(?m)^[ \t]*runs-on:(?:[^#\n]*-latest\b|[ \t]*\n(?:[ \t]+-[^#\n]*\n)*?[ \t]+-[^#\n]*-latest\b|[ \t]*\n(?:[ \t]+(?:group|labels):[^\n]*\n)*?[ \t]+labels:[^#\n]*-latest\b)(?![^\n]*#[ \t]*no-latest-runners:[ \t]*allow)'
+  args: [--multiline]
   language: pygrep
   files: ^\.github/(workflows|actions)/.*\.ya?ml$
