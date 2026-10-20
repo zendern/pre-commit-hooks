@@ -1,9 +1,8 @@
 # pre-commit-hooks
 
-Shared [pre-commit](https://pre-commit.com) hooks for zendern's repositories.
+Shared [pre-commit](https://pre-commit.com) hooks.
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
-pre-commit or [prek](https://prek.j178.dev) alike. Public, so CI (and public
-repos) can fetch them without credentials.
+pre-commit or [prek](https://prek.j178.dev) alike. 
 
 ## Usage
 
@@ -17,8 +16,9 @@ repos:
       - id: no-latest-runners
 ```
 
-Freeze `rev` to a commit SHA (`prek autoupdate --freeze` or
-`pre-commit autoupdate --freeze`); Renovate's pre-commit manager bumps it.
+> [!NOTE]
+> Suggestion:  Freeze `rev` to a commit SHA (`prek autoupdate --freeze` or
+> `pre-commit autoupdate --freeze`); You can also use Renovate's pre-commit manager to bump it.
 
 The hooks are Go programs (`language: golang`). pre-commit and prek build them
 with `go install` on first use, and download a Go toolchain if none is
@@ -30,13 +30,20 @@ installed.
 
 Fails when a workflow job runs on a floating runner label such as
 `ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
-labels to new images (`ubuntu-latest` moved to Ubuntu 26 from 2026-10-19), so
-an unpinned job changes OS without a commit. Pin a version instead:
+labels to new images (ex. `ubuntu-latest` moved to Ubuntu 26 starting on 2026-10-19), so
+an unpinned job changes OS without a commit potentially breaking builds since underlying tooling changes. 
+
+Pin a version instead:
 `ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
 
 It parses each workflow and reads `jobs.<id>.runs-on` in every form: a label, a
-list of labels, or a `group`/`labels` object. Labels set through an expression
-(`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
+list of labels, or a `group`/`labels` object. 
+
+> [!WARNING]
+> Labels set through an expression
+> (`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
+
+Failure output
 
 ```
 .github/workflows/ci.yml:12: job "build" runs on "ubuntu-latest"
