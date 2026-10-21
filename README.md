@@ -86,9 +86,15 @@ jobs:
     timeout-minutes: 15
 ```
 
-Expressions (`timeout-minutes: ${{ inputs.timeout }}`) count as set. Jobs that
-call a reusable workflow (`jobs.<id>.uses`) are skipped: GitHub doesn't accept
-`timeout-minutes` there, so the called workflow's own jobs need it.
+Jobs that call a reusable workflow (`jobs.<id>.uses`) are skipped: GitHub
+doesn't accept `timeout-minutes` there, so the called workflow's own jobs need
+it.
+
+> [!WARNING]
+> Timeouts set through an expression (`timeout-minutes: ${{ inputs.timeout }}`)
+> can't be resolved, so the hook can't check their value. They count as set,
+> and they are skipped when step and job timeouts are compared. If one resolves
+> to an empty or oversized value at run time, the hook can't catch it.
 
 Failure output
 
@@ -115,7 +121,7 @@ Steps are named by `name`, then `id`, then `uses`, else their position (`#2`).
 
 With `--steps`, a step's timeout must also be below its job's. GitHub cancels
 the job first, so a step timeout at or above the job's can never fire. Only
-plain numbers are compared; expressions are skipped.
+plain numbers are compared (see the warning above).
 
 ```
 .github/workflows/ci.yml:20: step "Test" timeout-minutes 45 is not below job "build" timeout-minutes 30
