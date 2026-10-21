@@ -4,3 +4,9 @@
   entry: no-latest-runners
   language: golang
   files: ^\.github/workflows/.*\.ya?ml$
+- id: require-timeouts
+  name: require timeout-minutes on jobs
+  description: Require timeout-minutes on GitHub Actions jobs (and, with --steps, on steps) so a hung run doesn't hold a runner for GitHub's 6-hour default.
+  entry: require-timeouts
+  language: golang
+  files: ^\.github/workflows/.*\.ya?ml$

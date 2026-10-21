@@ -1,0 +1,5 @@
+jobs:
+  a:
+    timeout-minutes: 10
+    steps:
+      - run: echo hi

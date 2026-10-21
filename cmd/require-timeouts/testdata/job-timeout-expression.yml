@@ -1,0 +1,6 @@
+jobs:
+  a:
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - run: make test
+        timeout-minutes: 45

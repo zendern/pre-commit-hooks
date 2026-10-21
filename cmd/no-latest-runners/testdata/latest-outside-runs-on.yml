@@ -1,0 +1,11 @@
+env:
+  RUNNER: ubuntu-latest
+jobs:
+  a:
+    # was ubuntu-latest
+    runs-on: ubuntu-24.04 # was ubuntu-latest
+    container: node:latest
+    env:
+      labels: ubuntu-latest
+    steps:
+      - run: echo ubuntu-latest

@@ -1,0 +1,13 @@
+jobs:
+  a:
+    runs-on: ubuntu-latest # no-latest-runners: allow
+  b:
+    runs-on:
+      - self-hosted
+      - macos-latest # no-latest-runners: allow
+  c:
+    runs-on: [self-hosted, windows-latest] # no-latest-runners: allow
+  d:
+    runs-on: # no-latest-runners: allow
+      group: big
+      labels: ubuntu-latest

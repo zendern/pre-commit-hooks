@@ -10,6 +10,15 @@ Shared [pre-commit](https://pre-commit.com) hooks.
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
 pre-commit or [prek](https://prek.j178.dev) alike. 
 
+## Contents
+
+- [Usage](#usage)
+- [Hooks](#hooks)
+  - [GitHub Actions](#github-actions)
+    - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
+    - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
+- [Development](#development)
+
 ## Usage
 
 In `.pre-commit-config.yaml`:
@@ -20,6 +29,7 @@ repos:
     rev: <full commit sha>  # frozen: v1.0.0
     hooks:
       - id: no-latest-runners
+      - id: require-timeouts
 ```
 
 > [!NOTE]
@@ -32,7 +42,11 @@ installed.
 
 ## Hooks
 
-### `no-latest-runners`
+### GitHub Actions
+
+These hooks check workflow files in `.github/workflows/`.
+
+#### `no-latest-runners`
 
 Fails when a workflow job runs on a floating runner label such as
 `ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
@@ -55,7 +69,7 @@ Failure output
 .github/workflows/ci.yml:12: job "build" runs on "ubuntu-latest"
 ```
 
-#### Exclusions
+##### Exclusions
 
 - One job: put `# no-latest-runners: allow` on its `runs-on` line (or on a
   list item's line).
@@ -71,6 +85,79 @@ Failure output
         - id: no-latest-runners
           exclude: ^\.github/workflows/experimental\.yml$
   ```
+
+#### `require-timeouts`
+
+Fails when a workflow job has no `timeout-minutes`. Without one, GitHub lets a
+hung job run for 360 minutes (6 hours) before it cancels it, holding a runner
+and billing minutes the whole time.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+```
+
+Jobs that call a reusable workflow (`jobs.<id>.uses`) are skipped: GitHub
+doesn't accept `timeout-minutes` there, so the called workflow's own jobs need
+it.
+
+> [!WARNING]
+> Timeouts set through an expression (`timeout-minutes: ${{ inputs.timeout }}`)
+> can't be resolved, so the hook can't check their value. They count as set,
+> and they are skipped when step and job timeouts are compared. If one resolves
+> to an empty or oversized value at run time, the hook can't catch it.
+
+Failure output
+
+```
+.github/workflows/ci.yml:12: job "build" has no timeout-minutes
+```
+
+##### Steps
+
+A job's timeout already caps its steps. To also require `timeout-minutes` on
+every step, pass `--steps`:
+
+```yaml
+    hooks:
+      - id: require-timeouts
+        args: [--steps]
+```
+
+```
+.github/workflows/ci.yml:20: step "Build" in job "build" has no timeout-minutes
+```
+
+Steps are named by `name`, then `id`, then `uses`, else their position (`#2`).
+
+With `--steps`, a step's timeout must also be below its job's. GitHub cancels
+the job first, so a step timeout at or above the job's can never fire. Only
+plain numbers are compared (see the warning above).
+
+```
+.github/workflows/ci.yml:20: step "Test" timeout-minutes 45 is not below job "build" timeout-minutes 30
+```
+
+Step timeouts may add up to more than the job's. Each one caps a single step's
+worst case, and the job timeout caps the whole run.
+
+##### Exclusions
+
+- One job or step: put `# require-timeouts: allow` on its first line. On a job,
+  this exempts its steps too.
+
+  ```yaml
+  jobs:
+    soak: # require-timeouts: allow
+      runs-on: ubuntu-24.04
+      steps:
+        - name: Soak test # require-timeouts: allow
+          run: ./soak.sh
+  ```
+
+- Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
 ## Development
 
