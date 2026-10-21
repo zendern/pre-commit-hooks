@@ -27,7 +27,7 @@ In `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/zendern/pre-commit-hooks
-    rev: <full commit sha>  # frozen: v1.0.0
+    rev: <full commit sha>  # frozen: v1.1.0
     hooks:
       - id: no-latest-runners
       - id: require-timeouts
