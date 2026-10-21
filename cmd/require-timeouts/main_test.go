@@ -11,7 +11,9 @@ func TestCheck(t *testing.T) {
 	tests := []struct {
 		file  string // in testdata/
 		steps bool
-		want  []string // "job step line"; step is "-" for a job finding
+		// "job step line" for a missing timeout, where step is "-" for a job;
+		// "job step line step>=job" for a step timeout the job's always beats.
+		want []string
 	}{
 		{"job-missing-timeout.yml", false, []string{"a - 2"}},
 		{"job-with-timeout.yml", false, nil},
@@ -24,6 +26,9 @@ func TestCheck(t *testing.T) {
 		{"step-position-label.yml", true, []string{"a #1 5"}},
 		{"job-and-steps-both-missing.yml", true, []string{"a - 2", "a #1 4"}},
 		{"allow-marker.yml", true, nil},
+		{"step-timeout-not-below-job.yml", true, []string{`a "Test" 8 30>=30`, `a "Soak" 11 45>=30`}},
+		{"step-timeout-not-below-job.yml", false, nil},
+		{"job-timeout-expression.yml", true, nil},
 		{"no-jobs.yml", false, nil},
 		{"empty.yml", false, nil},
 	}
@@ -40,7 +45,11 @@ func TestCheck(t *testing.T) {
 				if f.step != "" {
 					step = f.step
 				}
-				got = append(got, fmt.Sprint(f.job, " ", step, " ", f.line))
+				g := fmt.Sprint(f.job, " ", step, " ", f.line)
+				if f.stepTimeout != 0 {
+					g += fmt.Sprintf(" %g>=%g", f.stepTimeout, f.jobTimeout)
+				}
+				got = append(got, g)
 			}
 			if strings.Join(got, "|") != strings.Join(tt.want, "|") {
 				t.Errorf("got %q, want %q", got, tt.want)

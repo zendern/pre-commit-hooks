@@ -113,6 +113,17 @@ every step, pass `--steps`:
 
 Steps are named by `name`, then `id`, then `uses`, else their position (`#2`).
 
+With `--steps`, a step's timeout must also be below its job's. GitHub cancels
+the job first, so a step timeout at or above the job's can never fire. Only
+plain numbers are compared; expressions are skipped.
+
+```
+.github/workflows/ci.yml:20: step "Test" timeout-minutes 45 is not below job "build" timeout-minutes 30
+```
+
+Step timeouts may add up to more than the job's. Each one caps a single step's
+worst case, and the job timeout caps the whole run.
+
 #### Exclusions
 
 - One job or step: put `# require-timeouts: allow` on its first line. On a job,

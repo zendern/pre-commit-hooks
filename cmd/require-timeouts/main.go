@@ -2,7 +2,9 @@
 // timeout-minutes. Without one, GitHub lets a hung job run for 360 minutes
 // (6 hours) before it cancels it.
 //
-// With --steps, every step must set timeout-minutes too.
+// With --steps, every step must set timeout-minutes too, and a step's literal
+// timeout must be below its job's: the job is cancelled first, so a step
+// timeout at or above it can never fire.
 //
 // Jobs that call a reusable workflow (jobs.<id>.uses) are skipped: GitHub does
 // not accept timeout-minutes there, so the called workflow's jobs carry it. A
@@ -15,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -24,11 +27,14 @@ import (
 
 const allowMarker = "require-timeouts: allow"
 
-// finding is one job or step with no timeout. step is empty for a job.
+// finding is one job or step with no timeout (step is empty for a job), or,
+// when stepTimeout is set, a step whose timeout is not below its job's.
 type finding struct {
-	line int
-	job  string
-	step string
+	line        int
+	job         string
+	step        string
+	stepTimeout float64
+	jobTimeout  float64
 }
 
 func main() {
@@ -44,9 +50,13 @@ func main() {
 			continue
 		}
 		for _, f := range findings {
-			if f.step == "" {
+			switch {
+			case f.stepTimeout != 0:
+				fmt.Printf("%s:%d: step %s timeout-minutes %g is not below job %q timeout-minutes %g\n",
+					path, f.line, f.step, f.stepTimeout, f.job, f.jobTimeout)
+			case f.step == "":
 				fmt.Printf("%s:%d: job %q has no timeout-minutes\n", path, f.line, f.job)
-			} else {
+			default:
 				fmt.Printf("%s:%d: step %s in job %q has no timeout-minutes\n", path, f.line, f.step, f.job)
 			}
 			failed = true
@@ -54,6 +64,9 @@ func main() {
 	}
 	if failed {
 		fmt.Fprintln(os.Stderr, "Set timeout-minutes so a hung run is cancelled before GitHub's 6-hour default.")
+		if *steps {
+			fmt.Fprintln(os.Stderr, "Keep each step's timeout-minutes below its job's, or the job is cancelled first.")
+		}
 		os.Exit(1)
 	}
 }
@@ -100,11 +113,21 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 		if list == nil || list.Kind != yaml.SequenceNode {
 			continue
 		}
+		jobTimeout, jobLiteral := literalTimeout(job)
 		for i, step := range list.Content {
-			if step.Kind != yaml.MappingNode || allowedStep(step) || hasTimeout(step) {
+			if step.Kind != yaml.MappingNode || allowedStep(step) {
 				continue
 			}
-			findings = append(findings, finding{line: step.Line, job: name.Value, step: stepLabel(step, i)})
+			if !hasTimeout(step) {
+				findings = append(findings, finding{line: step.Line, job: name.Value, step: stepLabel(step, i)})
+				continue
+			}
+			if stepTimeout, ok := literalTimeout(step); ok && jobLiteral && jobTimeout > 0 && stepTimeout >= jobTimeout {
+				findings = append(findings, finding{
+					line: step.Line, job: name.Value, step: stepLabel(step, i),
+					stepTimeout: stepTimeout, jobTimeout: jobTimeout,
+				})
+			}
 		}
 	}
 	return findings, nil
@@ -115,6 +138,17 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 func hasTimeout(m *yaml.Node) bool {
 	_, v := yamlnode.Entry(m, "timeout-minutes")
 	return v != nil && v.Tag != "!!null"
+}
+
+// literalTimeout returns a job's or step's timeout-minutes when it is a plain
+// number, not an expression.
+func literalTimeout(m *yaml.Node) (float64, bool) {
+	_, v := yamlnode.Entry(m, "timeout-minutes")
+	if v == nil || (v.Tag != "!!int" && v.Tag != "!!float") {
+		return 0, false
+	}
+	n, err := strconv.ParseFloat(v.Value, 64)
+	return n, err == nil
 }
 
 // allowedStep looks for the marker on a step's first line, where YAML attaches
