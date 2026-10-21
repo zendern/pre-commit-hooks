@@ -33,7 +33,11 @@ installed.
 
 ## Hooks
 
-### `no-latest-runners`
+### GitHub Actions
+
+These hooks check workflow files in `.github/workflows/`.
+
+#### `no-latest-runners`
 
 Fails when a workflow job runs on a floating runner label such as
 `ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
@@ -56,7 +60,7 @@ Failure output
 .github/workflows/ci.yml:12: job "build" runs on "ubuntu-latest"
 ```
 
-#### Exclusions
+##### Exclusions
 
 - One job: put `# no-latest-runners: allow` on its `runs-on` line (or on a
   list item's line).
@@ -73,7 +77,7 @@ Failure output
           exclude: ^\.github/workflows/experimental\.yml$
   ```
 
-### `require-timeouts`
+#### `require-timeouts`
 
 Fails when a workflow job has no `timeout-minutes`. Without one, GitHub lets a
 hung job run for 360 minutes (6 hours) before it cancels it, holding a runner
@@ -102,7 +106,7 @@ Failure output
 .github/workflows/ci.yml:12: job "build" has no timeout-minutes
 ```
 
-#### Steps
+##### Steps
 
 A job's timeout already caps its steps. To also require `timeout-minutes` on
 every step, pass `--steps`:
@@ -130,7 +134,7 @@ plain numbers are compared (see the warning above).
 Step timeouts may add up to more than the job's. Each one caps a single step's
 worst case, and the job timeout caps the whole run.
 
-#### Exclusions
+##### Exclusions
 
 - One job or step: put `# require-timeouts: allow` on its first line. On a job,
   this exempts its steps too.
