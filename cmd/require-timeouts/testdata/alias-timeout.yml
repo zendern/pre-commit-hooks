@@ -1,0 +1,13 @@
+env:
+  NONE: &none null
+  LONG: &long 30
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: *none
+  b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: *long
+    steps:
+      - run: ./soak.sh
+        timeout-minutes: *long

@@ -29,6 +29,41 @@ func TestRoot(t *testing.T) {
 	}
 }
 
+func TestResolve(t *testing.T) {
+	m := Root(parse(t, "a: &x hello\nb: *x\n"))
+	_, a := Entry(m, "a")
+	_, b := Entry(m, "b")
+
+	if b.Kind != yaml.AliasNode {
+		t.Fatalf("b is %v, want the alias itself from Entry", b.Kind)
+	}
+	if got := Resolve(b); got != a {
+		t.Errorf("Resolve(alias) = %v, want the anchored node %v", got, a)
+	}
+	if got := Resolve(a); got != a {
+		t.Errorf("Resolve(non-alias) = %v, want the node itself", got)
+	}
+	if got := Resolve(nil); got != nil {
+		t.Errorf("Resolve(nil) = %v, want nil", got)
+	}
+}
+
+func TestEntryAndPairsFollowAnAliasedMapping(t *testing.T) {
+	m := Root(parse(t, "a: &m {k: v}\nb: *m\n"))
+	_, b := Entry(m, "b")
+
+	if _, v := Entry(b, "k"); v == nil || v.Value != "v" {
+		t.Errorf("Entry(alias, k) = %v, want the anchored mapping's value", v)
+	}
+	var keys []string
+	for k := range Pairs(b) {
+		keys = append(keys, k.Value)
+	}
+	if strings.Join(keys, " ") != "k" {
+		t.Errorf("Pairs(alias) keys = %q, want the anchored mapping's", keys)
+	}
+}
+
 func TestEntry(t *testing.T) {
 	m := Root(parse(t, "a: 1\nb: two\n"))
 

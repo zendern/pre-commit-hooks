@@ -1,0 +1,4 @@
+jobs:
+  test: &base_job
+    runs-on: ubuntu-24.04
+  alt-test: *base_job # require-timeouts: allow

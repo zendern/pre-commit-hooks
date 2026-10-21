@@ -90,6 +90,14 @@ func TestCheck(t *testing.T) {
 		{"allow-marker.yml", nil},
 		{"reusable-workflow-call.yml", nil},
 		{"empty.yml", nil},
+		// Aliases are followed and reported where they are used: the alias's
+		// line, or the job's key for a job reused whole.
+		{"alias-scalar.yml", []string{"a ubuntu-latest 5"}},
+		{"alias-reused-job.yml", []string{"test ubuntu-latest 3", "alt-test ubuntu-latest 4"}},
+		{"alias-list-item.yml", []string{"a macos-latest 7", "b macos-latest 9"}},
+		{"alias-labels.yml", []string{"a ubuntu-latest 5", "b ubuntu-latest 9", "c ubuntu-latest 11"}},
+		// A marker on the alias exempts that use; one on the anchor, every use.
+		{"alias-allow.yml", []string{"c ubuntu-latest 10", "g macos-latest 15"}},
 	}
 
 	for _, tt := range tests {

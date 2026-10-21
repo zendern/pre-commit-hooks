@@ -1,0 +1,11 @@
+jobs:
+  a:
+    runs-on: &big
+      group: big
+      labels: &labels [ubuntu-latest]
+  b:
+    runs-on:
+      group: big
+      labels: *labels
+  c:
+    runs-on: *big

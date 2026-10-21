@@ -1,0 +1,5 @@
+env:
+  RUNNER: &runner ubuntu-latest
+jobs:
+  a:
+    runs-on: *runner
