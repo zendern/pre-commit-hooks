@@ -2,109 +2,35 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestCheck(t *testing.T) {
 	tests := []struct {
-		name  string
+		file  string // in testdata/
 		steps bool
-		yaml  string
 		want  []string // "job step line"; step is "-" for a job finding
 	}{
-		{"job missing timeout", false, `
-jobs:
-  a:
-    runs-on: ubuntu-24.04
-    steps:
-      - run: echo hi
-`, []string{"a - 3"}},
-		{"job with timeout", false, `
-jobs:
-  a:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-`, nil},
-		{"expression timeout", false, `
-jobs:
-  a:
-    timeout-minutes: ${{ inputs.timeout }}
-`, nil},
-		{"empty timeout", false, `
-jobs:
-  a:
-    timeout-minutes:
-`, []string{"a - 3"}},
-		{"several jobs", false, `
-jobs:
-  a:
-    runs-on: ubuntu-24.04
-  b:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-  c:
-    runs-on: ubuntu-24.04
-`, []string{"a - 3", "c - 8"}},
-		{"reusable workflow call", false, `
-jobs:
-  a:
-    uses: ./.github/workflows/build.yml
-`, nil},
-		{"steps not checked by default", false, `
-jobs:
-  a:
-    timeout-minutes: 10
-    steps:
-      - run: echo hi
-`, nil},
-		{"steps checked", true, `
-jobs:
-  a:
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v5
-      - name: Build
-        run: make
-      - run: make test
-        timeout-minutes: 5
-      - id: lint
-        run: make lint
-`, []string{`a "actions/checkout@v5" 6`, `a "Build" 7`, `a "lint" 11`}},
-		{"step falls back to its position", true, `
-jobs:
-  a:
-    timeout-minutes: 10
-    steps:
-      - run: echo hi
-`, []string{"a #1 6"}},
-		{"job and steps both missing", true, `
-jobs:
-  a:
-    steps:
-      - run: echo hi
-`, []string{"a - 3", "a #1 5"}},
-		{"allow marker", true, `
-jobs:
-  a: # require-timeouts: allow
-    steps:
-      - run: echo hi
-  b:
-    timeout-minutes: 10
-    steps:
-      - run: ./long-soak-test # require-timeouts: allow
-      - name: Deploy # require-timeouts: allow
-        run: make deploy
-`, nil},
-		{"no jobs", false, `
-on: push
-`, nil},
-		{"empty file", false, ``, nil},
+		{"job-missing-timeout.yml", false, []string{"a - 2"}},
+		{"job-with-timeout.yml", false, nil},
+		{"expression-timeout.yml", false, nil},
+		{"empty-timeout.yml", false, []string{"a - 2"}},
+		{"several-jobs.yml", false, []string{"a - 2", "c - 7"}},
+		{"reusable-workflow-call.yml", false, nil},
+		{"steps-without-flag.yml", false, nil},
+		{"steps-checked.yml", true, []string{`a "actions/checkout@v5" 5`, `a "Build" 6`, `a "lint" 10`}},
+		{"step-position-label.yml", true, []string{"a #1 5"}},
+		{"job-and-steps-both-missing.yml", true, []string{"a - 2", "a #1 4"}},
+		{"allow-marker.yml", true, nil},
+		{"no-jobs.yml", false, nil},
+		{"empty.yml", false, nil},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			findings, err := check(strings.NewReader(tt.yaml), tt.steps)
+		t.Run(fmt.Sprintf("%s steps=%t", tt.file, tt.steps), func(t *testing.T) {
+			findings, err := checkFile(filepath.Join("testdata", tt.file), tt.steps)
 			if err != nil {
 				t.Fatalf("check: %v", err)
 			}

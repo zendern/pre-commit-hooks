@@ -1,0 +1,11 @@
+jobs:
+  a:
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build
+        run: make
+      - run: make test
+        timeout-minutes: 5
+      - id: lint
+        run: make lint

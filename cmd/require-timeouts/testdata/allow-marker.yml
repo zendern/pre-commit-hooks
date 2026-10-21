@@ -1,0 +1,10 @@
+jobs:
+  a: # require-timeouts: allow
+    steps:
+      - run: echo hi
+  b:
+    timeout-minutes: 10
+    steps:
+      - run: ./long-soak-test # require-timeouts: allow
+      - name: Deploy # require-timeouts: allow
+        run: make deploy
