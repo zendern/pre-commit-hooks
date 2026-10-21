@@ -20,6 +20,7 @@ repos:
     rev: <full commit sha>  # frozen: v1.0.0
     hooks:
       - id: no-latest-runners
+      - id: require-timeouts
 ```
 
 > [!NOTE]
@@ -71,6 +72,62 @@ Failure output
         - id: no-latest-runners
           exclude: ^\.github/workflows/experimental\.yml$
   ```
+
+### `require-timeouts`
+
+Fails when a workflow job has no `timeout-minutes`. Without one, GitHub lets a
+hung job run for 360 minutes (6 hours) before it cancels it, holding a runner
+and billing minutes the whole time.
+
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+```
+
+Expressions (`timeout-minutes: ${{ inputs.timeout }}`) count as set. Jobs that
+call a reusable workflow (`jobs.<id>.uses`) are skipped: GitHub doesn't accept
+`timeout-minutes` there, so the called workflow's own jobs need it.
+
+Failure output
+
+```
+.github/workflows/ci.yml:12: job "build" has no timeout-minutes
+```
+
+#### Steps
+
+A job's timeout already caps its steps. To also require `timeout-minutes` on
+every step, pass `--steps`:
+
+```yaml
+    hooks:
+      - id: require-timeouts
+        args: [--steps]
+```
+
+```
+.github/workflows/ci.yml:20: step "Build" in job "build" has no timeout-minutes
+```
+
+Steps are named by `name`, then `id`, then `uses`, else their position (`#2`).
+
+#### Exclusions
+
+- One job or step: put `# require-timeouts: allow` on its first line. On a job,
+  this exempts its steps too.
+
+  ```yaml
+  jobs:
+    soak: # require-timeouts: allow
+      runs-on: ubuntu-24.04
+      steps:
+        - name: Soak test # require-timeouts: allow
+          run: ./soak.sh
+  ```
+
+- Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
 ## Development
 

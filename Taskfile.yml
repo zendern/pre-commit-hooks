@@ -39,3 +39,4 @@ tasks:
     desc: Run the hooks against this repo's own workflows
     cmds:
       - go run ./cmd/no-latest-runners .github/workflows/*.yml
+      - go run ./cmd/require-timeouts .github/workflows/*.yml
