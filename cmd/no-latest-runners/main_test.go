@@ -2,107 +2,33 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestCheck(t *testing.T) {
 	tests := []struct {
-		name string
-		yaml string
+		file string   // in testdata/
 		want []string // "job label line"
 	}{
-		{"scalar", `
-jobs:
-  a:
-    runs-on: ubuntu-latest
-`, []string{"a ubuntu-latest 4"}},
-		{"quoted with comment", `
-jobs:
-  a:
-    runs-on: "macos-latest" # build on mac
-`, []string{"a macos-latest 4"}},
-		{"flow list", `
-jobs:
-  a:
-    runs-on: [self-hosted, windows-latest]
-`, []string{"a windows-latest 4"}},
-		{"block list", `
-jobs:
-  a:
-    runs-on:
-      - self-hosted
-      - ubuntu-latest
-    steps:
-      - run: echo hi
-`, []string{"a ubuntu-latest 6"}},
-		{"group labels", `
-jobs:
-  a:
-    runs-on:
-      group: big
-      labels: ubuntu-latest
-`, []string{"a ubuntu-latest 6"}},
-		{"several jobs", `
-jobs:
-  a:
-    runs-on: ubuntu-latest
-  b:
-    runs-on: ubuntu-24.04
-  c:
-    runs-on: macos-latest
-`, []string{"a ubuntu-latest 4", "c macos-latest 8"}},
-		{"pinned", `
-jobs:
-  a:
-    runs-on: ubuntu-24.04
-  b:
-    runs-on: [self-hosted, ubuntu-24.04-arm]
-`, nil},
-		{"latest only in other keys, steps and comments", `
-env:
-  RUNNER: ubuntu-latest
-jobs:
-  a:
-    # was ubuntu-latest
-    runs-on: ubuntu-24.04 # was ubuntu-latest
-    container: node:latest
-    env:
-      labels: ubuntu-latest
-    steps:
-      - run: echo ubuntu-latest
-`, nil},
-		{"expression", `
-jobs:
-  a:
-    runs-on: ${{ matrix.os }}
-`, nil},
-		{"allow marker", `
-jobs:
-  a:
-    runs-on: ubuntu-latest # no-latest-runners: allow
-  b:
-    runs-on:
-      - self-hosted
-      - macos-latest # no-latest-runners: allow
-  c:
-    runs-on: [self-hosted, windows-latest] # no-latest-runners: allow
-  d:
-    runs-on: # no-latest-runners: allow
-      group: big
-      labels: ubuntu-latest
-`, nil},
-		{"reusable workflow job without runs-on", `
-jobs:
-  a:
-    uses: ./.github/workflows/ci.yml
-`, nil},
-		{"empty file", ``, nil},
+		{"scalar.yml", []string{"a ubuntu-latest 3"}},
+		{"quoted-with-comment.yml", []string{"a macos-latest 3"}},
+		{"flow-list.yml", []string{"a windows-latest 3"}},
+		{"block-list.yml", []string{"a ubuntu-latest 5"}},
+		{"group-labels.yml", []string{"a ubuntu-latest 5"}},
+		{"several-jobs.yml", []string{"a ubuntu-latest 3", "c macos-latest 7"}},
+		{"pinned.yml", nil},
+		{"latest-outside-runs-on.yml", nil},
+		{"expression.yml", nil},
+		{"allow-marker.yml", nil},
+		{"reusable-workflow-call.yml", nil},
+		{"empty.yml", nil},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			findings, err := check(strings.NewReader(tt.yaml))
+		t.Run(tt.file, func(t *testing.T) {
+			findings, err := checkFile(filepath.Join("testdata", tt.file))
 			if err != nil {
 				t.Fatalf("check: %v", err)
 			}

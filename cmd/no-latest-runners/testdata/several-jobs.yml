@@ -1,0 +1,7 @@
+jobs:
+  a:
+    runs-on: ubuntu-latest
+  b:
+    runs-on: ubuntu-24.04
+  c:
+    runs-on: macos-latest

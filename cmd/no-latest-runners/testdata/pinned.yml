@@ -1,0 +1,5 @@
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+  b:
+    runs-on: [self-hosted, ubuntu-24.04-arm]

@@ -1,0 +1,7 @@
+jobs:
+  a:
+    runs-on:
+      - self-hosted
+      - ubuntu-latest
+    steps:
+      - run: echo hi
