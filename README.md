@@ -10,6 +10,15 @@ Shared [pre-commit](https://pre-commit.com) hooks.
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
 pre-commit or [prek](https://prek.j178.dev) alike. 
 
+## Contents
+
+- [Usage](#usage)
+- [Hooks](#hooks)
+  - [GitHub Actions](#github-actions)
+    - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
+    - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
+- [Development](#development)
+
 ## Usage
 
 In `.pre-commit-config.yaml`:
