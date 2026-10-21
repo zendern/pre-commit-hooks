@@ -12,9 +12,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # A cold prek cache builds golangci-lint from source; warm runs take about
+    # a minute.
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -24,17 +26,22 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Install Task (version pinned in Taskfile.yml)
-        run: |
-          version="$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
-          go install "github.com/go-task/task/v3/cmd/task@v${version}"
-      - run: task check
+      # Every hook in .pre-commit-config.yaml, exactly as it runs locally: file
+      # hygiene, zizmor, golangci-lint, this repo's own hooks on its workflows,
+      # the manifest check, tests, and go mod tidy. The token turns on zizmor's
+      # online audits.
+      - name: Run prek hooks
+        uses: j178/prek-action@af4d4fcb6922b8e6f65c0426947125fcc38794ce # v3.0.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          prek-version: "0.5.6"
 
   # Single required check (the shared default-branch ruleset requires a passing
   # workflow-summary).
   workflow-summary:
     if: ${{ always() }}
-    needs: [test]
+    needs: [checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -49,7 +56,7 @@ jobs:
   # nothing. Notes are generated from the merged PR titles.
   release:
     if: ${{ github.event_name == 'push' }}
-    needs: [test]
+    needs: [checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

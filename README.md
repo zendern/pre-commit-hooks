@@ -162,10 +162,15 @@ worst case, and the job timeout caps the whole run.
 
 ## Development
 
-With [Task](https://taskfile.dev):
+Needs Go, [prek](https://prek.j178.dev), and [Task](https://taskfile.dev). Run
+`prek install` once per clone: every check lives in `.pre-commit-config.yaml`
+(file hygiene, zizmor, golangci-lint, this repo's own hooks on its workflows,
+the manifest check, tests, `go mod tidy`) and runs on commit, and commit
+messages are checked against Conventional Commits. CI runs the same hooks on
+every file.
 
 ```sh
-task check          # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
+task check          # every hook on every file (what CI runs)
 task test           # tests only
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```

@@ -2,7 +2,8 @@
 version: "3"
 
 vars:
-  # The one source for the Task version CI installs (.github/workflows/ci.yml).
+  # The one source for the Task version CI's release job installs
+  # (.github/workflows/ci.yml).
   TASK_VERSION: 3.54.0
   # svu picks the next release version from the Conventional Commits since the
   # last tag. CI's release job reads this pin too.
@@ -14,24 +15,9 @@ tasks:
       - task: check
 
   check:
-    desc: Everything CI runs
+    desc: Every hook in .pre-commit-config.yaml on every file (what CI runs)
     cmds:
-      - task: fmt-check
-      - task: vet
-      - task: test
-      - task: dogfood
-
-  fmt-check:
-    desc: Fail if any Go file needs gofmt
-    cmds:
-      - |
-        out="$(gofmt -l .)"
-        if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
-
-  vet:
-    desc: go vet
-    cmds:
-      - go vet ./...
+      - prek run --all-files
 
   test:
     desc: go test
@@ -48,9 +34,3 @@ tasks:
         current="$({{.SVU}} current)"
         next="$({{.SVU}} next)"
         if [ "$next" != "$current" ]; then echo "$next"; fi
-
-  dogfood:
-    desc: Run the hooks against this repo's own workflows
-    cmds:
-      - go run ./cmd/no-latest-runners .github/workflows/*.yml
-      - go run ./cmd/require-timeouts .github/workflows/*.yml

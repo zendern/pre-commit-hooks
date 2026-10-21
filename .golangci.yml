@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  # The standard set (errcheck, govet, ineffassign, staticcheck, unused) plus
+  # a few cheap ones that catch real mistakes in small CLIs like these.
+  default: standard
+  enable:
+    - errorlint
+    - misspell
+    - nolintlint
+  settings:
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/zendern/pre-commit-hooks

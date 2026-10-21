@@ -1,0 +1,80 @@
+# Git hooks, run by prek (https://prek.j178.dev), a faster drop-in for
+# pre-commit. `prek install` sets up every hook type listed below, and CI runs
+# all of them with `prek run --all-files`. Remote hooks are frozen to a commit
+# SHA with the tag in a comment (`prek autoupdate --freeze`).
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+repos:
+  # Built into prek: no download, no network.
+  - repo: builtin
+    hooks:
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Conventional Commits check on the commit message. The release job picks
+  # each version from these (README, Releases), so a bad type ships nothing.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: 91ab4bf57e58b32adf1a122681f6ebe164d081c8 # frozen: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+  # GitHub Actions security audit of the workflows. Offline unless GH_TOKEN is
+  # set, as in CI, which turns on the online audits.
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: d25b2b1dc80689fb633f21f6978bba69871181d3 # frozen: v1.31.0
+    hooks:
+      - id: zizmor
+
+  # Lint and format (.golangci.yml). -full lints the whole module rather than
+  # only changes since HEAD, which is quick here and right in CI.
+  - repo: https://github.com/golangci/golangci-lint
+    rev: 114493f9b3e7257d29e4130f2b4a4aadefbb6845 # frozen: v2.14.0
+    hooks:
+      - id: golangci-lint-config-verify
+      - id: golangci-lint-full
+      - id: golangci-lint-fmt
+
+  - repo: local
+    hooks:
+      # This repo's own hooks, built from the working tree, run on its own
+      # workflows: the code being changed checks itself before it is released.
+      - id: no-latest-runners
+        name: no-latest-runners (this checkout)
+        entry: go run ./cmd/no-latest-runners
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+      - id: require-timeouts
+        name: require-timeouts (this checkout)
+        entry: go run ./cmd/require-timeouts
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+      # The manifest is what every consuming repo installs from, so a bad
+      # entry or language breaks them all.
+      - id: validate-manifest
+        name: validate .pre-commit-hooks.yaml
+        entry: prek validate-manifest
+        language: system
+        files: ^\.pre-commit-hooks\.yaml$
+      - id: go-test
+        name: go test
+        entry: go test ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+      # Go files too: adding or dropping an import can leave go.mod untidy.
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: go mod tidy -diff
+        language: system
+        files: (\.go|(^|/)go\.(mod|sum))$
+        pass_filenames: false
