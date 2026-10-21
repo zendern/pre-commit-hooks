@@ -181,7 +181,8 @@ task setup   # alias: task install-tools
 
 `task setup` installs every other tool into `./bin` at the versions pinned in
 `Taskfile.yml` ([prek](https://prek.j178.dev), golangci-lint, govulncheck,
-go-licenses, go-test-coverage, gremlins), then the git hooks. Run it in the
+go-licenses, go-test-coverage, gremlins, [ratchet](https://github.com/sethvargo/ratchet)),
+then the git hooks. Run it in the
 main checkout, not a worktree: worktrees share its hooks, and the hooks run the
 prek in the `./bin` of whichever checkout installed them. Every `go` command
 Task runs uses the exact toolchain in `go.mod` (`GOTOOLCHAIN`), which Go
@@ -198,6 +199,15 @@ the packages a PR changes, and on the whole module weekly. A tagless
 `switch { case cond: }` fails lint (`tools/lint/rules.go`), because gremlins
 cannot mutate case conditions; write `if` statements.
 
+Every action in a workflow must be pinned to a commit SHA: zizmor's
+`unpinned-uses` audit fails a tag like `actions/checkout@v5`, on commit and in
+CI. After adding or changing a `uses:` line, run `task pin` (ratchet), which
+rewrites it to `actions/checkout@<sha> # ratchet:actions/checkout@v5` and leaves
+lines already pinned alone. It looks refs up through the GitHub API, so set
+`GITHUB_TOKEN` (for example `GITHUB_TOKEN=$(gh auth token) task pin`) to avoid
+the anonymous rate limit. Renovate then keeps the pins current; it reads both
+the `# ratchet:` and `# vX.Y.Z` comment styles.
+
 ```sh
 task check          # every hook on every file (what CI runs)
 task test           # tests with the race detector
@@ -207,6 +217,8 @@ task fmt            # gofumpt and goimports
 task mutate         # mutation testing (mutate-diff BASE=<ref> for changed packages)
 task vuln           # govulncheck
 task licenses       # dependency license check
+task pin            # pin new or changed GitHub Actions to a commit SHA (ratchet)
+task pin-check      # fail on any unpinned action or container image (ratchet lint)
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```
 
