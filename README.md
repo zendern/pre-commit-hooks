@@ -18,6 +18,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
 - [Development](#development)
+  - [Releases](#releases)
 
 ## Usage
 
@@ -164,6 +165,17 @@ worst case, and the job timeout caps the whole run.
 With [Task](https://taskfile.dev):
 
 ```sh
-task check   # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
-task test    # tests only
+task check          # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
+task test           # tests only
+task next-version   # the version merging this branch would release
 ```
+
+### Releases
+
+Merging to `main` releases automatically. CI's `release` job runs
+[svu](https://github.com/caarlos0/svu) over the
+[Conventional Commits](https://www.conventionalcommits.org/) since the last
+tag: a `fix` cuts a patch, a `feat` a minor, and a breaking change (`feat!:`,
+or a `BREAKING CHANGE:` footer) a major. Anything else (`docs`, `ci`, `chore`,
+...) releases nothing. The release notes are generated from the merged PR
+titles, so give a squash-merged PR a conventional title.
