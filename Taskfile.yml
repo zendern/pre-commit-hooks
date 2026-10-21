@@ -39,9 +39,15 @@ tasks:
       - go test ./...
 
   next-version:
-    desc: Print the version merging this branch would release (the last tag means none)
+    desc: Print the version merging this branch would release, or nothing if it would not release
+    vars:
+      SVU: go run github.com/caarlos0/svu/v3@{{.SVU_VERSION}}
     cmds:
-      - go run github.com/caarlos0/svu/v3@{{.SVU_VERSION}} next
+      # svu next prints the current version when no commit calls for a bump.
+      - |
+        current="$({{.SVU}} current)"
+        next="$({{.SVU}} next)"
+        if [ "$next" != "$current" ]; then echo "$next"; fi
 
   dogfood:
     desc: Run the hooks against this repo's own workflows

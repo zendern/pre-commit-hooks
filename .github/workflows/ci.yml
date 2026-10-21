@@ -69,15 +69,17 @@ jobs:
           go-version-file: go.mod
           # A release job must not restore a cache a PR run could have written.
           cache: false
+      - name: Install Task (version pinned in Taskfile.yml)
+        run: |
+          version="$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
+          go install "github.com/go-task/task/v3/cmd/task@v${version}"
       - name: Release if the commits since the last tag call for one
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          svu="github.com/caarlos0/svu/v3@$(sed -n 's/^  SVU_VERSION: *//p' Taskfile.yml)"
-          current="$(go run "$svu" current)"
-          next="$(go run "$svu" next)"
-          if [ "$next" = "$current" ]; then
-            echo "No release: nothing since $current is a fix, feat, or breaking change."
+          next="$(task --silent next-version)"
+          if [ -z "$next" ]; then
+            echo "No release: nothing since the last tag is a fix, feat, or breaking change."
             exit 0
           fi
           gh release create "$next" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$next" --generate-notes

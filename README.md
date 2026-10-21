@@ -167,7 +167,7 @@ With [Task](https://taskfile.dev):
 ```sh
 task check          # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
 task test           # tests only
-task next-version   # the version merging this branch would release
+task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```
 
 ### Releases
