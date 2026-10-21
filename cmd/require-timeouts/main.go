@@ -13,6 +13,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -72,12 +74,11 @@ func main() {
 }
 
 func checkFile(path string, steps bool) ([]finding, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return check(f, steps)
+	return check(bytes.NewReader(data), steps)
 }
 
 // check returns every job, and with steps every step, that has no timeout in
@@ -85,7 +86,7 @@ func checkFile(path string, steps bool) ([]finding, error) {
 func check(r io.Reader, steps bool) ([]finding, error) {
 	var doc yaml.Node
 	if err := yaml.NewDecoder(r).Decode(&doc); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil, nil
 		}
 		return nil, err

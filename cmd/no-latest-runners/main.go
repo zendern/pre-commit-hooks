@@ -10,6 +10,8 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -50,19 +52,18 @@ func main() {
 }
 
 func checkFile(path string) ([]finding, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	return check(f)
+	return check(bytes.NewReader(data))
 }
 
 // check returns every floating runner label in one workflow file.
 func check(r io.Reader) ([]finding, error) {
 	var doc yaml.Node
 	if err := yaml.NewDecoder(r).Decode(&doc); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil, nil
 		}
 		return nil, err
