@@ -1,0 +1,16 @@
+env:
+  RUNNER: &runner ubuntu-latest
+  ALLOWED: &allowed windows-latest # no-latest-runners: allow
+jobs:
+  a:
+    runs-on: *runner # no-latest-runners: allow
+  b:
+    runs-on: *allowed
+  c:
+    runs-on: *runner
+  e: &floating
+    runs-on: ubuntu-latest # no-latest-runners: allow
+  f: *floating
+  g: &other
+    runs-on: macos-latest
+  h: *other # no-latest-runners: allow

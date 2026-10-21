@@ -47,6 +47,15 @@ installed.
 
 These hooks check workflow files in `.github/workflows/`.
 
+Both follow [YAML anchors and aliases](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+(`&name` / `*name`), which GitHub Actions supports, wherever a value can be
+one: a reused job (`alt-test: *base_job`), `runs-on`, its labels, `steps`, a
+step, or `timeout-minutes`. A finding about an aliased value is reported where
+it is used: the job's key for a reused job, otherwise the alias's line. An
+allow marker on the anchored value covers every use of it; one on an alias's
+line covers that use only. Merge keys (`<<: *name`) are not followed: GitHub
+does not support them.
+
 #### `no-latest-runners`
 
 Fails when a workflow job runs on a floating runner label such as

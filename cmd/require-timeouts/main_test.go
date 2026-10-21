@@ -137,6 +137,15 @@ func TestCheck(t *testing.T) {
 		{"comment-only.yml", false, nil},
 		{"steps-missing.yml", true, nil},
 		{"step-flow-allow.yml", true, []string{"a #2 7"}},
+		// Aliases are followed and reported where they are used: the alias's
+		// line, or the job's key for a job reused whole.
+		{"alias-reused-job.yml", false, []string{"test - 2", "alt-test - 6"}},
+		{"alias-reused-job.yml", true, []string{"test - 2", "test #1 5", "alt-test - 6", "alt-test #1 6"}},
+		{"alias-timeout.yml", true, []string{"a - 5", `b #1 12 30>=30`}},
+		{"alias-steps.yml", true, []string{
+			`a "actions/checkout@v5" 6`, `b "actions/checkout@v5" 10`, `c "actions/checkout@v5" 15`,
+		}},
+		{"alias-allow.yml", false, []string{"test - 2"}},
 	}
 
 	for _, tt := range tests {

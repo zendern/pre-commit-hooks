@@ -1,0 +1,30 @@
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps: &steps
+      - &checkout {uses: actions/checkout@v5}
+  b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps: *steps
+  c:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - *checkout
+  d:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - *checkout # require-timeouts: allow
+  e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - &soak {run: ./soak.sh} # require-timeouts: allow
+  f:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - *soak

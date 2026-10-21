@@ -1,0 +1,9 @@
+env:
+  OS: &os macos-latest
+jobs:
+  a:
+    runs-on:
+      - self-hosted
+      - *os
+  b:
+    runs-on: [self-hosted, *os]

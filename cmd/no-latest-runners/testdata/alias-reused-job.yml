@@ -1,0 +1,4 @@
+jobs:
+  test: &base_job
+    runs-on: ubuntu-latest
+  alt-test: *base_job

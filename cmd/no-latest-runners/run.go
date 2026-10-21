@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -66,40 +67,61 @@ func check(r io.Reader) ([]finding, error) {
 	var findings []finding
 	_, jobs := yamlnode.Entry(yamlnode.Root(&doc), "jobs")
 	for name, job := range yamlnode.Pairs(jobs) {
+		// A job reused whole (`b: *a`) is reported at its own key.
+		var at *yaml.Node
+		if job.Kind == yaml.AliasNode {
+			at = name
+		}
 		key, runsOn := yamlnode.Entry(job, "runs-on")
 		// The marker can sit on the runs-on line itself (where YAML attaches
-		// it to the key or to a flow list) or on a block-list item's line.
-		if allowed(key) || allowed(runsOn) {
+		// it to the key or to a flow list), on a block-list item's line, or
+		// on a reused job's `b: *a` line (where it attaches to the alias).
+		if allowed(job) || allowed(key) || allowed(runsOn) {
 			continue
 		}
-		for _, label := range labels(runsOn) {
-			if isFloating(label) && !allowed(label) {
-				findings = append(findings, finding{line: label.Line, job: name.Value, label: label.Value})
+		for _, l := range labels(runsOn, at) {
+			if isFloating(l.node) && !allowed(l.node) && !allowed(l.at) {
+				findings = append(findings, finding{line: l.at.Line, job: name.Value, label: l.node.Value})
 			}
 		}
 	}
 	return findings, nil
 }
 
+// label is one runner label, after aliases are followed, and the node a finding
+// about it is reported at: the outermost alias it was reached through, a reused
+// job's key included, else the label itself. An allow marker on either counts:
+// one on the anchored label covers every use, one on an alias that use only.
+type label struct {
+	node *yaml.Node
+	at   *yaml.Node
+}
+
 func allowed(n *yaml.Node) bool {
 	return n != nil && strings.Contains(n.LineComment, allowMarker)
 }
 
-// labels flattens a runs-on value into its label nodes.
-func labels(runsOn *yaml.Node) []*yaml.Node {
+// labels flattens a runs-on value into its labels. at is the outermost alias
+// already passed through, or nil.
+func labels(runsOn, at *yaml.Node) []label {
 	if runsOn == nil {
 		return nil
 	}
 	switch runsOn.Kind {
+	case yaml.AliasNode:
+		return labels(runsOn.Alias, cmp.Or(at, runsOn))
 	case yaml.ScalarNode:
-		return []*yaml.Node{runsOn}
+		return []label{{node: runsOn, at: cmp.Or(at, runsOn)}}
 	case yaml.SequenceNode:
-		return runsOn.Content
-	case yaml.MappingNode: // {group, labels}
+		var all []label
+		for _, item := range runsOn.Content {
+			all = append(all, labels(item, at)...)
+		}
+		return all
+	default: // a {group, labels} mapping
 		_, l := yamlnode.Entry(runsOn, "labels")
-		return labels(l)
+		return labels(l, at)
 	}
-	return nil
 }
 
 func isFloating(label *yaml.Node) bool {

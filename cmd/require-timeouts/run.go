@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
@@ -95,7 +96,11 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 	var findings []finding
 	_, jobs := yamlnode.Entry(yamlnode.Root(&doc), "jobs")
 	for name, job := range yamlnode.Pairs(jobs) {
-		if job.Kind != yaml.MappingNode || allowed(name) || allowed(job) {
+		// Aliases are followed, and a finding is reported where the value is
+		// used: the job's key for a job reused whole (`b: *a`), else the
+		// outermost alias passed through. An allow marker on the anchored job
+		// or step covers every use, one on an alias that use only.
+		if yamlnode.Resolve(job).Kind != yaml.MappingNode || allowed(name) || allowed(job) {
 			continue
 		}
 		if _, uses := yamlnode.Entry(job, "uses"); uses != nil {
@@ -107,22 +112,32 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 		if !steps {
 			continue
 		}
+		var at *yaml.Node
+		if job.Kind == yaml.AliasNode {
+			at = name
+		}
 		_, list := yamlnode.Entry(job, "steps")
+		if list != nil && list.Kind == yaml.AliasNode {
+			at = cmp.Or(at, list)
+		}
+		list = yamlnode.Resolve(list)
 		if list == nil || list.Kind != yaml.SequenceNode {
 			continue
 		}
 		jobTimeout, jobLiteral := literalTimeout(job)
-		for i, step := range list.Content {
-			if step.Kind != yaml.MappingNode || allowedStep(step) {
+		for i, item := range list.Content {
+			step := yamlnode.Resolve(item)
+			if step.Kind != yaml.MappingNode || allowed(item) || allowedStep(step) {
 				continue
 			}
+			line := cmp.Or(at, item).Line
 			if !hasTimeout(step) {
-				findings = append(findings, finding{line: step.Line, job: name.Value, step: stepLabel(step, i)})
+				findings = append(findings, finding{line: line, job: name.Value, step: stepLabel(step, i)})
 				continue
 			}
 			if stepTimeout, ok := literalTimeout(step); ok && jobLiteral && jobTimeout > 0 && stepTimeout >= jobTimeout {
 				findings = append(findings, finding{
-					line: step.Line, job: name.Value, step: stepLabel(step, i),
+					line: line, job: name.Value, step: stepLabel(step, i),
 					stepTimeout: stepTimeout, jobTimeout: jobTimeout,
 				})
 			}
@@ -135,6 +150,7 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 // other than null.
 func hasTimeout(m *yaml.Node) bool {
 	_, v := yamlnode.Entry(m, "timeout-minutes")
+	v = yamlnode.Resolve(v)
 	return v != nil && v.Tag != "!!null"
 }
 
@@ -142,6 +158,7 @@ func hasTimeout(m *yaml.Node) bool {
 // number, not an expression.
 func literalTimeout(m *yaml.Node) (float64, bool) {
 	_, v := yamlnode.Entry(m, "timeout-minutes")
+	v = yamlnode.Resolve(v)
 	if v == nil || (v.Tag != "!!int" && v.Tag != "!!float") {
 		return 0, false
 	}
