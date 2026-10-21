@@ -1,0 +1,35 @@
+version: "2"
+
+linters:
+  # The standard set (errcheck, govet, ineffassign, staticcheck, unused) plus
+  # a few cheap ones that catch real mistakes in small CLIs like these.
+  default: standard
+  enable:
+    - errorlint
+    - gocritic
+    - misspell
+    - nolintlint
+  settings:
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      # ifElseChain asks for a tagless switch, which tools/lint/rules.go bans.
+      disabled-checks:
+        - ifElseChain
+      settings:
+        ruleguard:
+          # Project rules; each says why it exists.
+          rules: "${base-path}/tools/lint/rules.go"
+          failOn: all
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/zendern/pre-commit-hooks

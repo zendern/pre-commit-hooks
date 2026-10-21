@@ -1,0 +1,9 @@
+# Pinned tools (task setup)
+/bin/
+
+# Test artifacts
+*.out
+coverage.*
+
+# Local git worktrees
+.worktrees/

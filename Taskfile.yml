@@ -2,55 +2,238 @@
 version: "3"
 
 vars:
-  # The one source for the Task version CI installs (.github/workflows/ci.yml).
+  BIN: "{{.ROOT_DIR}}/bin"
+
+  # Pinned tool versions. Check for the latest release before bumping by hand.
+  # `task setup` installs all of them into ./bin except Task itself, which has
+  # to exist before any task can run (see README); CI installs it from this pin.
+  # renovate: datasource=github-releases depName=go-task/task extractVersion=^v(?<version>.+)$
   TASK_VERSION: 3.54.0
+  # CI's prek-action reads this pin too.
+  # renovate: datasource=github-releases depName=j178/prek extractVersion=^v(?<version>.+)$
+  PREK_VERSION: 0.5.6
   # svu picks the next release version from the Conventional Commits since the
-  # last tag. CI's release job reads this pin too.
+  # last tag (next-version below).
+  # renovate: datasource=go depName=github.com/caarlos0/svu/v3
   SVU_VERSION: v3.4.1
+  # renovate: datasource=github-releases depName=golangci/golangci-lint
+  GOLANGCI_LINT_VERSION: v2.14.0
+  # renovate: datasource=github-releases depName=golang/vuln
+  GOVULNCHECK_VERSION: v1.9.0
+  # renovate: datasource=github-releases depName=google/go-licenses
+  GO_LICENSES_VERSION: v2.0.1
+  # renovate: datasource=github-releases depName=vladopajic/go-test-coverage
+  GO_TEST_COVERAGE_VERSION: v2.20.0
+  # renovate: datasource=github-releases depName=go-gremlins/gremlins
+  GREMLINS_VERSION: v0.6.0
+
+  # The Go toolchain go.mod targets. Every go command below runs it (see env).
+  GO_TOOLCHAIN:
+    sh: echo "go$(sed -n 's/^go //p' go.mod)"
+
+  # Target of the prek release binary for this machine.
+  PREK_TARGET: '{{if eq ARCH "arm64"}}aarch64{{else}}x86_64{{end}}-{{if eq OS "darwin"}}apple-darwin{{else}}unknown-linux-gnu{{end}}'
+
+  ALLOWED_LICENSES: Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC
+
+env:
+  # Run exactly the go.mod toolchain, downloading it when the installed Go is a
+  # different version (older or newer), so local runs match CI. Tools are built
+  # with it too: `go install pkg@version` otherwise picks the tool's own minimum
+  # Go, and tools built with an older Go refuse to analyze this module. Go
+  # before 1.21 ignores GOTOOLCHAIN, which `task setup` checks for.
+  GOTOOLCHAIN: "{{.GO_TOOLCHAIN}}"
 
 tasks:
   default:
     cmds:
       - task: check
 
+  setup:
+    desc: Install every pinned tool into ./bin, then the git hooks (run once per clone, after installing Go and Task)
+    aliases: [install-tools]
+    preconditions:
+      - sh: GOTOOLCHAIN=local go env GOVERSION | awk -F. '{sub(/^go/, "", $1); exit !($1 > 1 || ($1 == 1 && $2 + 0 >= 21))}'
+        msg: "Go 1.21 or newer is required: older versions ignore GOTOOLCHAIN, so they cannot switch to the {{.GO_TOOLCHAIN}} that go.mod targets"
+      - sh: '[ "$({{.TASK_EXE}} --version | sed -E "s/^(Task version: )?v?//; s/ .*//")" = "{{.TASK_VERSION}}" ]'
+        msg: "Task {{.TASK_VERSION}} is required (see README)"
+    cmds:
+      - task: tools
+      - "{{.BIN}}/prek install"
+
   check:
-    desc: Everything CI runs
+    desc: Every hook in .pre-commit-config.yaml on every file (what CI runs)
+    deps: [tool:prek]
     cmds:
-      - task: fmt-check
-      - task: vet
-      - task: test
-      - task: dogfood
-
-  fmt-check:
-    desc: Fail if any Go file needs gofmt
-    cmds:
-      - |
-        out="$(gofmt -l .)"
-        if [ -n "$out" ]; then echo "gofmt needed:"; echo "$out"; exit 1; fi
-
-  vet:
-    desc: go vet
-    cmds:
-      - go vet ./...
+      - "{{.BIN}}/prek run --all-files"
 
   test:
-    desc: go test
+    desc: Run tests with the race detector
     cmds:
-      - go test ./...
+      - go test -race -count=1 ./...
+
+  cover:
+    desc: Run tests with coverage and enforce the thresholds in .testcoverage.yml
+    deps: [tool:go-test-coverage]
+    cmds:
+      - go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
+      - "{{.BIN}}/go-test-coverage --config=.testcoverage.yml"
+
+  mutate:
+    desc: Mutation test the module with gremlins (slow, so not a hook)
+    deps: [tool:gremlins]
+    cmds:
+      - scripts/gremlins.sh "{{.BIN}}/gremlins" . {{.CLI_ARGS}}
+
+  mutate-diff:
+    desc: Mutation test each package with Go changes since BASE (default origin/main), test-only changes included
+    deps: [tool:gremlins]
+    vars:
+      BASE: '{{.BASE | default "origin/main"}}'
+    cmds:
+      # Whole packages rather than changed lines, so a PR that only adds tests
+      # is measured too. Each package must meet .gremlins.yaml on its own.
+      - |
+        found=0
+        for dir in $(git diff --name-only "{{.BASE}}...HEAD" -- '*.go' | xargs -r -n1 dirname | sort -u); do
+          # Skip deleted packages, test-only directories, and files excluded
+          # from every build (such as the ruleguard rules in tools/lint).
+          [ "$(go list -f '{{"{{"}}len .GoFiles{{"}}"}}' "./$dir" 2>/dev/null || echo 0)" != 0 ] || continue
+          found=1
+          echo "==> mutating ./$dir"
+          scripts/gremlins.sh "{{.BIN}}/gremlins" "./$dir"
+        done
+        if [ "$found" = 0 ]; then
+          echo "No Go packages changed since {{.BASE}}."
+        fi
+
+  lint:
+    desc: Verify .golangci.yml, then run golangci-lint
+    deps: [tool:golangci-lint]
+    cmds:
+      - "{{.BIN}}/golangci-lint config verify"
+      - "{{.BIN}}/golangci-lint run ./..."
+
+  fmt:
+    desc: Format Go code (gofumpt and goimports, via golangci-lint)
+    deps: [tool:golangci-lint]
+    cmds:
+      - "{{.BIN}}/golangci-lint fmt"
+
+  fmt-check:
+    desc: Fail if any Go file needs task fmt
+    deps: [tool:golangci-lint]
+    cmds:
+      - "{{.BIN}}/golangci-lint fmt --diff"
+
+  vuln:
+    desc: Check dependencies and the standard library for known vulnerabilities
+    deps: [tool:govulncheck]
+    cmds:
+      - "{{.BIN}}/govulncheck ./..."
+
+  licenses:
+    desc: Check dependency licenses against the allow list
+    deps: [tool:go-licenses]
+    cmds:
+      - "{{.BIN}}/go-licenses check ./... --allowed_licenses={{.ALLOWED_LICENSES}}"
 
   next-version:
     desc: Print the version merging this branch would release, or nothing if it would not release
     vars:
       SVU: go run github.com/caarlos0/svu/v3@{{.SVU_VERSION}}
+      # What a consuming repo builds and runs. Tests and their fixtures are not.
+      SHIPPED: cmd internal go.mod go.sum .pre-commit-hooks.yaml ':!**/*_test.go' ':!**/testdata/**'
     cmds:
-      # svu next prints the current version when no commit calls for a bump.
+      # svu next prints the current version when no commit calls for a bump. A
+      # refactor, perf or build change to the shipped code still changes what
+      # every bumping repo runs, so it is at least a patch.
       - |
         current="$({{.SVU}} current)"
         next="$({{.SVU}} next)"
+        if [ "$next" = "$current" ] && ! git diff --quiet "$current" HEAD -- {{.SHIPPED}}; then
+          next="$({{.SVU}} patch)"
+        fi
         if [ "$next" != "$current" ]; then echo "$next"; fi
 
-  dogfood:
-    desc: Run the hooks against this repo's own workflows
+  tools:
+    desc: Install the pinned tools into ./bin (each also installs on first use)
+    deps: [tool:golangci-lint, tool:govulncheck, tool:go-licenses, tool:go-test-coverage, tool:gremlins, tool:prek]
+
+  tool:golangci-lint:
+    internal: true
     cmds:
-      - go run ./cmd/no-latest-runners .github/workflows/*.yml
-      - go run ./cmd/require-timeouts .github/workflows/*.yml
+      - task: go-install
+        vars: {NAME: golangci-lint, PKG: github.com/golangci/golangci-lint/v2/cmd/golangci-lint, MOD: github.com/golangci/golangci-lint/v2, VER: "{{.GOLANGCI_LINT_VERSION}}"}
+
+  tool:govulncheck:
+    internal: true
+    cmds:
+      - task: go-install
+        vars: {NAME: govulncheck, PKG: golang.org/x/vuln/cmd/govulncheck, MOD: golang.org/x/vuln, VER: "{{.GOVULNCHECK_VERSION}}"}
+
+  tool:go-licenses:
+    internal: true
+    cmds:
+      - task: go-install
+        vars: {NAME: go-licenses, PKG: github.com/google/go-licenses/v2, MOD: github.com/google/go-licenses/v2, VER: "{{.GO_LICENSES_VERSION}}"}
+
+  tool:go-test-coverage:
+    internal: true
+    cmds:
+      - task: go-install
+        vars: {NAME: go-test-coverage, PKG: github.com/vladopajic/go-test-coverage/v2, MOD: github.com/vladopajic/go-test-coverage/v2, VER: "{{.GO_TEST_COVERAGE_VERSION}}"}
+
+  tool:gremlins:
+    internal: true
+    cmds:
+      - task: go-install
+        vars: {NAME: gremlins, PKG: github.com/go-gremlins/gremlins/cmd/gremlins, MOD: github.com/go-gremlins/gremlins, VER: "{{.GREMLINS_VERSION}}"}
+
+  # prek runs the git hooks, and installs each remote hook's own tool (zizmor)
+  # at the version its rev pins. Its release binary is checked
+  # against the .sha256 published next to it, and releases are immutable, so a
+  # tag's assets cannot be replaced after the fact.
+  tool:prek:
+    internal: true
+    label: "install prek@{{.PREK_VERSION}}"
+    preconditions:
+      - sh: case "{{OS}}/{{ARCH}}" in darwin/amd64 | darwin/arm64 | linux/amd64 | linux/arm64) ;; *) exit 1 ;; esac
+        msg: "no prek release binary for {{OS}}/{{ARCH}}; install prek {{.PREK_VERSION}} into {{.BIN}} by hand"
+    status:
+      - |
+        "{{.BIN}}/prek" --version 2>/dev/null | awk '$1 == "prek" && $2 == "{{.PREK_VERSION}}" {found = 1} END {exit !found}'
+    cmds:
+      - |
+        set -eu
+        asset="prek-{{.PREK_TARGET}}.tar.gz"
+        url="https://github.com/j178/prek/releases/download/v{{.PREK_VERSION}}/$asset"
+        tmp="{{.BIN}}/.download-prek"
+        rm -rf "$tmp"
+        mkdir -p "$tmp"
+        curl -fsSL -o "$tmp/$asset" "$url"
+        curl -fsSL -o "$tmp/$asset.sha256" "$url.sha256"
+        want="$(cut -d ' ' -f 1 "$tmp/$asset.sha256")"
+        got="$( (sha256sum "$tmp/$asset" 2>/dev/null || shasum -a 256 "$tmp/$asset") | cut -d ' ' -f 1)"
+        if [ "$got" != "$want" ]; then echo "checksum mismatch for $asset: got $got, want $want" >&2; rm -rf "$tmp"; exit 1; fi
+        tar -xzf "$tmp/$asset" -C "$tmp"
+        install -m 0755 "$(find "$tmp" -type f -name prek | head -n 1)" "{{.BIN}}/prek"
+        rm -rf "$tmp"
+
+  # Installs a Go tool unless ./bin already holds that module version built with
+  # the go.mod toolchain, so bumping a pin or go.mod rebuilds it.
+  go-install:
+    internal: true
+    label: "install {{.NAME}}@{{.VER}}"
+    status:
+      - |
+        go version -m "{{.BIN}}/{{.NAME}}" 2>/dev/null | head -n1 | grep -qx "{{.BIN}}/{{.NAME}}: {{.GO_TOOLCHAIN}}"
+      - |
+        go version -m "{{.BIN}}/{{.NAME}}" 2>/dev/null | awk '$1 == "mod" && $2 == "{{.MOD}}" && $3 == "{{.VER}}" {found = 1} END {exit !found}'
+    cmds:
+      - GOBIN={{.BIN}} go install {{.PKG}}@{{.VER}}
+
+  clean:
+    desc: Remove ./bin
+    cmds:
+      - rm -rf {{.BIN}}

@@ -1,0 +1,8 @@
+jobs:
+  a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+  b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps: none

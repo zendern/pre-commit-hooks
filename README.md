@@ -1,14 +1,14 @@
 # pre-commit-hooks
 
 [![ci](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go_1.26-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go_1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 
 Shared [pre-commit](https://pre-commit.com) hooks.
 
 
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
-pre-commit or [prek](https://prek.j178.dev) alike. 
+pre-commit or [prek](https://prek.j178.dev) alike.
 
 ## Contents
 
@@ -52,13 +52,13 @@ These hooks check workflow files in `.github/workflows/`.
 Fails when a workflow job runs on a floating runner label such as
 `ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
 labels to new images (ex. `ubuntu-latest` moved to Ubuntu 26 starting on 2026-10-19), so
-an unpinned job changes OS without a commit potentially breaking builds since underlying tooling changes. 
+an unpinned job changes OS without a commit potentially breaking builds since underlying tooling changes.
 
 Pin a version instead:
 `ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
 
 It parses each workflow and reads `jobs.<id>.runs-on` in every form: a label, a
-list of labels, or a `group`/`labels` object. 
+list of labels, or a `group`/`labels` object.
 
 > [!WARNING]
 > Labels set through an expression
@@ -162,11 +162,42 @@ worst case, and the job timeout caps the whole run.
 
 ## Development
 
-With [Task](https://taskfile.dev):
+Install Go 1.21 or newer, then [Task](https://taskfile.dev) at the
+`TASK_VERSION` pinned in `Taskfile.yml`:
 
 ```sh
-task check          # gofmt, vet, tests, and the hooks against this repo's workflows (what CI runs)
-task test           # tests only
+go install github.com/go-task/task/v3/cmd/task@v"$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
+task setup   # alias: task install-tools
+```
+
+`task setup` installs every other tool into `./bin` at the versions pinned in
+`Taskfile.yml` ([prek](https://prek.j178.dev), golangci-lint, govulncheck,
+go-licenses, go-test-coverage, gremlins), then the git hooks. Run it in the
+main checkout, not a worktree: worktrees share its hooks, and the hooks run the
+prek in the `./bin` of whichever checkout installed them. Every `go` command
+Task runs uses the exact toolchain in `go.mod` (`GOTOOLCHAIN`), which Go
+downloads when yours is a different version.
+
+Every check lives in `.pre-commit-config.yaml` and runs on commit: file
+hygiene, zizmor, golangci-lint (with gofumpt and goimports), this repo's own
+hooks on its workflows, the manifest check, tests with a 95% coverage gate
+(`.testcoverage.yml`), `go mod tidy`, govulncheck, and go-licenses. Commit
+messages are checked against Conventional Commits. CI runs the same hooks on
+every file. Mutation testing (gremlins, 95% efficacy and mutant coverage in
+`.gremlins.yaml`) is too slow for a hook: the `mutation` workflow runs it on
+the packages a PR changes, and on the whole module weekly. A tagless
+`switch { case cond: }` fails lint (`tools/lint/rules.go`), because gremlins
+cannot mutate case conditions; write `if` statements.
+
+```sh
+task check          # every hook on every file (what CI runs)
+task test           # tests with the race detector
+task cover          # tests with the coverage gate
+task lint           # golangci-lint
+task fmt            # gofumpt and goimports
+task mutate         # mutation testing (mutate-diff BASE=<ref> for changed packages)
+task vuln           # govulncheck
+task licenses       # dependency license check
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```
 
@@ -176,6 +207,9 @@ Merging to `main` releases automatically. CI's `release` job runs
 [svu](https://github.com/caarlos0/svu) over the
 [Conventional Commits](https://www.conventionalcommits.org/) since the last
 tag: a `fix` cuts a patch, a `feat` a minor, and a breaking change (`feat!:`,
-or a `BREAKING CHANGE:` footer) a major. Anything else (`docs`, `ci`, `chore`,
-...) releases nothing. The release notes are generated from the merged PR
-titles, so give a squash-merged PR a conventional title.
+or a `BREAKING CHANGE:` footer) a major. Any other change to the code a
+consuming repo runs (`cmd/`, `internal/`, `go.mod`, `go.sum`,
+`.pre-commit-hooks.yaml`, tests and test fixtures aside), such as a `refactor`
+or `perf`, cuts a patch too. Anything else (`docs`, `ci`, `chore`, tests)
+releases nothing. The release notes are generated from the merged PR titles, so
+give a squash-merged PR a conventional title.

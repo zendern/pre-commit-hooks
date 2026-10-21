@@ -1,0 +1,18 @@
+# Coverage gate for `task cover` (https://github.com/vladopajic/go-test-coverage).
+# Thresholds are 95% everywhere, so a change that adds untested code fails
+# instead of slowly lowering the average. Lowering one, or excluding a path,
+# needs a reason in the PR.
+profile: coverage.out
+
+threshold:
+  file: 95
+  package: 95
+  total: 95
+
+# Each excluded path needs a reason here.
+exclude:
+  paths:
+    # Only main: each hands os.Args and the standard streams to run and exits.
+    # run holds the logic and is tested directly; a unit test cannot call
+    # main without exiting the test binary.
+    - ^cmd/[^/]+/main\.go$

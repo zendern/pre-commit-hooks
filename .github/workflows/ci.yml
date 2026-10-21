@@ -12,9 +12,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  checks:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    # A cold ./bin cache builds every Go tool from source; warm runs take a
+    # couple of minutes.
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -22,19 +24,42 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        id: setup-go
         with:
           go-version-file: go.mod
       - name: Install Task (version pinned in Taskfile.yml)
         run: |
           version="$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
           go install "github.com/go-task/task/v3/cmd/task@v${version}"
-      - run: task check
+      # The Go tools are built from source into ./bin (see Taskfile.yml).
+      # Restoring ./bin lets Task's status check in go-install see the right
+      # module version and Go toolchain and skip the build. A bumped pin in
+      # Taskfile.yml, go.mod or the Go version changes the key and rebuilds.
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: bin
+          key: tools-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.mod', 'Taskfile.yml') }}
+      # Same prek as `task setup` installs locally.
+      - name: Read the prek version pinned in Taskfile.yml
+        id: prek
+        run: |
+          echo "version=$(sed -n 's/^  PREK_VERSION: *//p' Taskfile.yml)" >> "$GITHUB_OUTPUT"
+      # Every hook in .pre-commit-config.yaml, exactly as it runs locally: file
+      # hygiene, zizmor, golangci-lint, this repo's own hooks on its workflows,
+      # the manifest check, tests with the coverage gate, go mod tidy,
+      # govulncheck, and go-licenses. The token turns on zizmor's online audits.
+      - name: Run prek hooks
+        uses: j178/prek-action@af4d4fcb6922b8e6f65c0426947125fcc38794ce # v3.0.2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          prek-version: ${{ steps.prek.outputs.version }}
 
   # Single required check (the shared default-branch ruleset requires a passing
   # workflow-summary).
   workflow-summary:
     if: ${{ always() }}
-    needs: [test]
+    needs: [checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -49,7 +74,7 @@ jobs:
   # nothing. Notes are generated from the merged PR titles.
   release:
     if: ${{ github.event_name == 'push' }}
-    needs: [test]
+    needs: [checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

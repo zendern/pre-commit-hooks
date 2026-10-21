@@ -1,0 +1,53 @@
+name: mutation
+
+# Mutation testing is slower than the rest of CI, so it has its own workflow:
+# pull requests mutate only the packages they change, and a weekly run covers
+# the whole module so the thresholds in .gremlins.yaml hold for code nobody
+# touched. Drafts and docs-only changes skip it.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - "**/*.md"
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    name: mutation testing
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
+    runs-on: ubuntu-24.04
+    # A whole-module run takes well under a minute today; this leaves room to
+    # grow before a hung mutant is the more likely cause.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The diff against the base branch needs its history.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install Task (version pinned in Taskfile.yml)
+        run: |
+          version="$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
+          go install "github.com/go-task/task/v3/cmd/task@v${version}"
+      - name: Mutate changed packages
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: task mutate-diff BASE="$BASE_SHA"
+      - name: Mutate the whole module
+        if: github.event_name != 'pull_request'
+        run: task mutate
