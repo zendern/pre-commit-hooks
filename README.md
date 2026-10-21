@@ -8,7 +8,7 @@ Shared [pre-commit](https://pre-commit.com) hooks.
 
 
 They use the standard `.pre-commit-hooks.yaml` format, so they run under
-pre-commit or [prek](https://prek.j178.dev) alike. 
+pre-commit or [prek](https://prek.j178.dev) alike.
 
 ## Contents
 
@@ -52,13 +52,13 @@ These hooks check workflow files in `.github/workflows/`.
 Fails when a workflow job runs on a floating runner label such as
 `ubuntu-latest`, `macos-latest` or `windows-latest`. GitHub repoints those
 labels to new images (ex. `ubuntu-latest` moved to Ubuntu 26 starting on 2026-10-19), so
-an unpinned job changes OS without a commit potentially breaking builds since underlying tooling changes. 
+an unpinned job changes OS without a commit potentially breaking builds since underlying tooling changes.
 
 Pin a version instead:
 `ubuntu-24.04`, `ubuntu-24.04-arm`, `macos-15`, ...
 
 It parses each workflow and reads `jobs.<id>.runs-on` in every form: a label, a
-list of labels, or a `group`/`labels` object. 
+list of labels, or a `group`/`labels` object.
 
 > [!WARNING]
 > Labels set through an expression
