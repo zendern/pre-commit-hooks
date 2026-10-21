@@ -181,6 +181,9 @@ Merging to `main` releases automatically. CI's `release` job runs
 [svu](https://github.com/caarlos0/svu) over the
 [Conventional Commits](https://www.conventionalcommits.org/) since the last
 tag: a `fix` cuts a patch, a `feat` a minor, and a breaking change (`feat!:`,
-or a `BREAKING CHANGE:` footer) a major. Anything else (`docs`, `ci`, `chore`,
-...) releases nothing. The release notes are generated from the merged PR
-titles, so give a squash-merged PR a conventional title.
+or a `BREAKING CHANGE:` footer) a major. Any other change to the code a
+consuming repo runs (`cmd/`, `internal/`, `go.mod`, `go.sum`,
+`.pre-commit-hooks.yaml`, tests and test fixtures aside), such as a `refactor`
+or `perf`, cuts a patch too. Anything else (`docs`, `ci`, `chore`, tests)
+releases nothing. The release notes are generated from the merged PR titles, so
+give a squash-merged PR a conventional title.

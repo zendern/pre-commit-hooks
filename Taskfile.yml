@@ -28,9 +28,16 @@ tasks:
     desc: Print the version merging this branch would release, or nothing if it would not release
     vars:
       SVU: go run github.com/caarlos0/svu/v3@{{.SVU_VERSION}}
+      # What a consuming repo builds and runs. Tests and their fixtures are not.
+      SHIPPED: cmd internal go.mod go.sum .pre-commit-hooks.yaml ':!**/*_test.go' ':!**/testdata/**'
     cmds:
-      # svu next prints the current version when no commit calls for a bump.
+      # svu next prints the current version when no commit calls for a bump. A
+      # refactor, perf or build change to the shipped code still changes what
+      # every bumping repo runs, so it is at least a patch.
       - |
         current="$({{.SVU}} current)"
         next="$({{.SVU}} next)"
+        if [ "$next" = "$current" ] && ! git diff --quiet "$current" HEAD -- {{.SHIPPED}}; then
+          next="$({{.SVU}} patch)"
+        fi
         if [ "$next" != "$current" ]; then echo "$next"; fi
