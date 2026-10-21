@@ -4,6 +4,9 @@ version: "3"
 vars:
   # The one source for the Task version CI installs (.github/workflows/ci.yml).
   TASK_VERSION: 3.54.0
+  # svu picks the next release version from the Conventional Commits since the
+  # last tag. CI's release job reads this pin too.
+  SVU_VERSION: v3.4.1
 
 tasks:
   default:
@@ -34,6 +37,17 @@ tasks:
     desc: go test
     cmds:
       - go test ./...
+
+  next-version:
+    desc: Print the version merging this branch would release, or nothing if it would not release
+    vars:
+      SVU: go run github.com/caarlos0/svu/v3@{{.SVU_VERSION}}
+    cmds:
+      # svu next prints the current version when no commit calls for a bump.
+      - |
+        current="$({{.SVU}} current)"
+        next="$({{.SVU}} next)"
+        if [ "$next" != "$current" ]; then echo "$next"; fi
 
   dogfood:
     desc: Run the hooks against this repo's own workflows
