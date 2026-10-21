@@ -16,6 +16,8 @@ import (
 	"strings"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/zendern/pre-commit-hooks/internal/yamlnode"
 )
 
 const allowMarker = "no-latest-runners: allow"
@@ -70,9 +72,9 @@ func check(r io.Reader) ([]finding, error) {
 	}
 
 	var findings []finding
-	_, jobs := entry(doc.Content[0], "jobs")
-	for name, job := range mapping(jobs) {
-		key, runsOn := entry(job, "runs-on")
+	_, jobs := yamlnode.Entry(doc.Content[0], "jobs")
+	for name, job := range yamlnode.Pairs(jobs) {
+		key, runsOn := yamlnode.Entry(job, "runs-on")
 		// The marker can sit on the runs-on line itself (where YAML attaches
 		// it to the key or to a flow list) or on a block-list item's line.
 		if allowed(key) || allowed(runsOn) {
@@ -80,7 +82,7 @@ func check(r io.Reader) ([]finding, error) {
 		}
 		for _, label := range labels(runsOn) {
 			if isFloating(label) && !allowed(label) {
-				findings = append(findings, finding{line: label.Line, job: name, label: label.Value})
+				findings = append(findings, finding{line: label.Line, job: name.Value, label: label.Value})
 			}
 		}
 	}
@@ -102,7 +104,7 @@ func labels(runsOn *yaml.Node) []*yaml.Node {
 	case yaml.SequenceNode:
 		return runsOn.Content
 	case yaml.MappingNode: // {group, labels}
-		_, l := entry(runsOn, "labels")
+		_, l := yamlnode.Entry(runsOn, "labels")
 		return labels(l)
 	}
 	return nil
@@ -112,31 +114,4 @@ func isFloating(label *yaml.Node) bool {
 	return label.Kind == yaml.ScalarNode &&
 		strings.HasSuffix(label.Value, "-latest") &&
 		!strings.Contains(label.Value, "${{")
-}
-
-// entry returns the key and value nodes for key in a mapping node, or nils.
-func entry(m *yaml.Node, key string) (*yaml.Node, *yaml.Node) {
-	if m == nil || m.Kind != yaml.MappingNode {
-		return nil, nil
-	}
-	for i := 0; i+1 < len(m.Content); i += 2 {
-		if m.Content[i].Value == key {
-			return m.Content[i], m.Content[i+1]
-		}
-	}
-	return nil, nil
-}
-
-// mapping yields the key/value pairs of a mapping node in file order.
-func mapping(m *yaml.Node) func(yield func(string, *yaml.Node) bool) {
-	return func(yield func(string, *yaml.Node) bool) {
-		if m == nil || m.Kind != yaml.MappingNode {
-			return
-		}
-		for i := 0; i+1 < len(m.Content); i += 2 {
-			if !yield(m.Content[i].Value, m.Content[i+1]) {
-				return
-			}
-		}
-	}
 }
