@@ -35,17 +35,24 @@ repos:
     hooks:
       - id: zizmor
 
-  # Lint and format (.golangci.yml). -full lints the whole module rather than
-  # only changes since HEAD, which is quick here and right in CI.
-  - repo: https://github.com/golangci/golangci-lint
-    rev: 114493f9b3e7257d29e4130f2b4a4aadefbb6845 # frozen: v2.14.0
-    hooks:
-      - id: golangci-lint-config-verify
-      - id: golangci-lint-full
-      - id: golangci-lint-fmt
-
   - repo: local
     hooks:
+      # golangci-lint through the Taskfile (.golangci.yml), built with the
+      # go.mod toolchain: its upstream hook builds and runs it with whatever Go
+      # is installed, which fails once that is older than go.mod. Formatting is
+      # gofumpt and goimports.
+      - id: golangci-lint
+        name: golangci-lint
+        entry: task lint
+        language: system
+        files: (\.go|(^|/)go\.(mod|sum)|(^|/)\.golangci\.yml)$
+        pass_filenames: false
+      - id: golangci-lint-fmt
+        name: golangci-lint fmt
+        entry: task fmt-check
+        language: system
+        types: [go]
+        pass_filenames: false
       # This repo's own hooks, built from the working tree, run on its own
       # workflows: the code being changed checks itself before it is released.
       - id: no-latest-runners
@@ -65,9 +72,11 @@ repos:
         entry: prek validate-manifest
         language: system
         files: ^\.pre-commit-hooks\.yaml$
+      # The Go checks run through the Taskfile, so tool versions and the
+      # go.mod toolchain (GOTOOLCHAIN) stay pinned in one place.
       - id: go-test
-        name: go test
-        entry: go test ./...
+        name: go test with coverage thresholds
+        entry: task cover
         language: system
         types: [go]
         pass_filenames: false
@@ -77,4 +86,18 @@ repos:
         entry: go mod tidy -diff
         language: system
         files: (\.go|(^|/)go\.(mod|sum))$
+        pass_filenames: false
+      # Both judge the dependencies (govulncheck also the standard library of
+      # the go.mod toolchain, and only what the code reaches).
+      - id: govulncheck
+        name: govulncheck
+        entry: task vuln
+        language: system
+        files: (\.go|(^|/)go\.(mod|sum))$
+        pass_filenames: false
+      - id: go-licenses
+        name: go-licenses
+        entry: task licenses
+        language: system
+        files: (^|/)go\.(mod|sum)$
         pass_filenames: false

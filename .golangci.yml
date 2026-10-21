@@ -6,16 +6,28 @@ linters:
   default: standard
   enable:
     - errorlint
+    - gocritic
     - misspell
     - nolintlint
   settings:
+    gocritic:
+      enabled-checks:
+        - ruleguard
+      # ifElseChain asks for a tagless switch, which tools/lint/rules.go bans.
+      disabled-checks:
+        - ifElseChain
+      settings:
+        ruleguard:
+          # Project rules; each says why it exists.
+          rules: "${base-path}/tools/lint/rules.go"
+          failOn: all
     nolintlint:
       require-explanation: true
       require-specific: true
 
 formatters:
   enable:
-    - gofmt
+    - gofumpt
     - goimports
   settings:
     goimports:

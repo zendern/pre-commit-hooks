@@ -1,7 +1,7 @@
 # pre-commit-hooks
 
 [![ci](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go_1.26-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go_1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 
 Shared [pre-commit](https://pre-commit.com) hooks.
@@ -162,16 +162,38 @@ worst case, and the job timeout caps the whole run.
 
 ## Development
 
-Needs Go, [prek](https://prek.j178.dev), and [Task](https://taskfile.dev). Run
-`prek install` once per clone: every check lives in `.pre-commit-config.yaml`
-(file hygiene, zizmor, golangci-lint, this repo's own hooks on its workflows,
-the manifest check, tests, `go mod tidy`) and runs on commit, and commit
+Install Go 1.21 or newer, then [Task](https://taskfile.dev) at the
+`TASK_VERSION` pinned in `Taskfile.yml`:
+
+```sh
+go install github.com/go-task/task/v3/cmd/task@v"$(sed -n 's/^  TASK_VERSION: *//p' Taskfile.yml)"
+task setup   # alias: task install-tools
+```
+
+`task setup` installs every other tool into `./bin` at the versions pinned in
+`Taskfile.yml` ([prek](https://prek.j178.dev), golangci-lint, govulncheck,
+go-licenses, go-test-coverage), then the git hooks. Run it in the
+main checkout, not a worktree: worktrees share its hooks, and the hooks run the
+prek in the `./bin` of whichever checkout installed them. Every `go` command
+Task runs uses the exact toolchain in `go.mod` (`GOTOOLCHAIN`), which Go
+downloads when yours is a different version.
+
+Every check lives in `.pre-commit-config.yaml` and runs on commit: file
+hygiene, zizmor, golangci-lint (with gofumpt and goimports), this repo's own
+hooks on its workflows, the manifest check, tests with a 95% coverage gate
+(`.testcoverage.yml`), `go mod tidy`, govulncheck, and go-licenses. Commit
 messages are checked against Conventional Commits. CI runs the same hooks on
-every file.
+every file. A tagless `switch { case cond: }` fails lint
+(`tools/lint/rules.go`); write `if` statements.
 
 ```sh
 task check          # every hook on every file (what CI runs)
-task test           # tests only
+task test           # tests with the race detector
+task cover          # tests with the coverage gate
+task lint           # golangci-lint
+task fmt            # gofumpt and goimports
+task vuln           # govulncheck
+task licenses       # dependency license check
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```
 
