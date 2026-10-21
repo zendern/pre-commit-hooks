@@ -24,6 +24,8 @@ vars:
   GO_LICENSES_VERSION: v2.0.1
   # renovate: datasource=github-releases depName=vladopajic/go-test-coverage
   GO_TEST_COVERAGE_VERSION: v2.20.0
+  # renovate: datasource=github-releases depName=go-gremlins/gremlins
+  GREMLINS_VERSION: v0.6.0
 
   # The Go toolchain go.mod targets. Every go command below runs it (see env).
   GO_TOOLCHAIN:
@@ -77,6 +79,34 @@ tasks:
       - go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./...
       - "{{.BIN}}/go-test-coverage --config=.testcoverage.yml"
 
+  mutate:
+    desc: Mutation test the module with gremlins (slow, so not a hook)
+    deps: [tool:gremlins]
+    cmds:
+      - scripts/gremlins.sh "{{.BIN}}/gremlins" . {{.CLI_ARGS}}
+
+  mutate-diff:
+    desc: Mutation test each package with Go changes since BASE (default origin/main), test-only changes included
+    deps: [tool:gremlins]
+    vars:
+      BASE: '{{.BASE | default "origin/main"}}'
+    cmds:
+      # Whole packages rather than changed lines, so a PR that only adds tests
+      # is measured too. Each package must meet .gremlins.yaml on its own.
+      - |
+        found=0
+        for dir in $(git diff --name-only "{{.BASE}}...HEAD" -- '*.go' | xargs -r -n1 dirname | sort -u); do
+          # Skip deleted packages, test-only directories, and files excluded
+          # from every build (such as the ruleguard rules in tools/lint).
+          [ "$(go list -f '{{"{{"}}len .GoFiles{{"}}"}}' "./$dir" 2>/dev/null || echo 0)" != 0 ] || continue
+          found=1
+          echo "==> mutating ./$dir"
+          scripts/gremlins.sh "{{.BIN}}/gremlins" "./$dir"
+        done
+        if [ "$found" = 0 ]; then
+          echo "No Go packages changed since {{.BASE}}."
+        fi
+
   lint:
     desc: Verify .golangci.yml, then run golangci-lint
     deps: [tool:golangci-lint]
@@ -128,7 +158,7 @@ tasks:
 
   tools:
     desc: Install the pinned tools into ./bin (each also installs on first use)
-    deps: [tool:golangci-lint, tool:govulncheck, tool:go-licenses, tool:go-test-coverage, tool:prek]
+    deps: [tool:golangci-lint, tool:govulncheck, tool:go-licenses, tool:go-test-coverage, tool:gremlins, tool:prek]
 
   tool:golangci-lint:
     internal: true
@@ -153,6 +183,12 @@ tasks:
     cmds:
       - task: go-install
         vars: {NAME: go-test-coverage, PKG: github.com/vladopajic/go-test-coverage/v2, MOD: github.com/vladopajic/go-test-coverage/v2, VER: "{{.GO_TEST_COVERAGE_VERSION}}"}
+
+  tool:gremlins:
+    internal: true
+    cmds:
+      - task: go-install
+        vars: {NAME: gremlins, PKG: github.com/go-gremlins/gremlins/cmd/gremlins, MOD: github.com/go-gremlins/gremlins, VER: "{{.GREMLINS_VERSION}}"}
 
   # prek runs the git hooks, and installs each remote hook's own tool (zizmor)
   # at the version its rev pins. Its release binary is checked

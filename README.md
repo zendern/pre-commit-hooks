@@ -172,7 +172,7 @@ task setup   # alias: task install-tools
 
 `task setup` installs every other tool into `./bin` at the versions pinned in
 `Taskfile.yml` ([prek](https://prek.j178.dev), golangci-lint, govulncheck,
-go-licenses, go-test-coverage), then the git hooks. Run it in the
+go-licenses, go-test-coverage, gremlins), then the git hooks. Run it in the
 main checkout, not a worktree: worktrees share its hooks, and the hooks run the
 prek in the `./bin` of whichever checkout installed them. Every `go` command
 Task runs uses the exact toolchain in `go.mod` (`GOTOOLCHAIN`), which Go
@@ -183,8 +183,11 @@ hygiene, zizmor, golangci-lint (with gofumpt and goimports), this repo's own
 hooks on its workflows, the manifest check, tests with a 95% coverage gate
 (`.testcoverage.yml`), `go mod tidy`, govulncheck, and go-licenses. Commit
 messages are checked against Conventional Commits. CI runs the same hooks on
-every file. A tagless `switch { case cond: }` fails lint
-(`tools/lint/rules.go`); write `if` statements.
+every file. Mutation testing (gremlins, 95% efficacy and mutant coverage in
+`.gremlins.yaml`) is too slow for a hook: the `mutation` workflow runs it on
+the packages a PR changes, and on the whole module weekly. A tagless
+`switch { case cond: }` fails lint (`tools/lint/rules.go`), because gremlins
+cannot mutate case conditions; write `if` statements.
 
 ```sh
 task check          # every hook on every file (what CI runs)
@@ -192,6 +195,7 @@ task test           # tests with the race detector
 task cover          # tests with the coverage gate
 task lint           # golangci-lint
 task fmt            # gofumpt and goimports
+task mutate         # mutation testing (mutate-diff BASE=<ref> for changed packages)
 task vuln           # govulncheck
 task licenses       # dependency license check
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
