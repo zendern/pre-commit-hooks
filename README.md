@@ -51,6 +51,9 @@ installed.
 
 These hooks check workflow files in `.github/workflows/`.
 
+Runner labels are compared without regard to case, as
+[GitHub does](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/apply-labels).
+
 All of them follow [YAML anchors and aliases](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
 (`&name` / `*name`), which GitHub Actions supports, wherever a value can be
 one: a reused job (`alt-test: *base_job`), `runs-on`, its labels, `steps`, a
@@ -236,8 +239,8 @@ which ones are on the required architecture with a
         args: [--arch=arm64, --custom-label-matcher=^arc-arm-]
 ```
 
-The expression is searched for in each label, so anchor it, and GitHub's labels
-are not case-sensitive, so add `(?i)` if yours vary. With this flag set:
+The expression is searched for in each label, so anchor it. It ignores case,
+because GitHub's labels do. With this flag set:
 
 - A job passes when any of its labels matches.
 - A job with only custom labels fails when none of them match, and self-hosted

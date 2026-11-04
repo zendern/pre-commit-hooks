@@ -1,0 +1,13 @@
+jobs:
+  a:
+    runs-on: Ubuntu-24.04
+  b:
+    runs-on: Ubuntu-24.04-ARM
+  c:
+    runs-on: MACOS-13
+  d:
+    runs-on: [Self-Hosted, Linux]
+  e:
+    runs-on: macOS-15
+  f:
+    runs-on: ARC-ARM-small

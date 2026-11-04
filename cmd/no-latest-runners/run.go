@@ -135,6 +135,7 @@ func labels(runsOn, at *yaml.Node) []label {
 	}
 }
 
+// isFloating ignores case because GitHub's labels do.
 func isFloating(label *yaml.Node) bool {
-	return label.Kind == yaml.ScalarNode && strings.HasSuffix(label.Value, "-latest")
+	return label.Kind == yaml.ScalarNode && strings.HasSuffix(strings.ToLower(label.Value), "-latest")
 }
