@@ -10,9 +10,9 @@
   entry: require-timeouts
   language: golang
   files: ^\.github/workflows/.*\.ya?ml$
-- id: require-arm-runners
-  name: require arm64 runners
-  description: Fail on x64 GitHub-hosted runner labels (e.g. ubuntu-24.04), because arm64 runners cost less per minute in private repositories.
-  entry: require-arm-runners
+- id: require-runner-arch
+  name: require a runner architecture
+  description: Fail on GitHub Actions jobs that run on the wrong CPU architecture. Pass --arch=arm64 or --arch=x64.
+  entry: require-runner-arch
   language: golang
   files: ^\.github/workflows/.*\.ya?ml$
