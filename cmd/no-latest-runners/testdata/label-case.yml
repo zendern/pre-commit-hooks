@@ -1,0 +1,5 @@
+jobs:
+  a:
+    runs-on: Ubuntu-Latest
+  b:
+    runs-on: macos-LATEST
