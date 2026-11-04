@@ -1,0 +1,13 @@
+jobs:
+  a:
+    runs-on: ubuntu-latest
+  b:
+    runs-on: ubuntu-slim
+  c:
+    runs-on: windows-latest
+  d:
+    runs-on: macos-15-intel
+  e:
+    runs-on: macos-15-large
+  f:
+    runs-on: macos-13

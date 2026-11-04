@@ -1,0 +1,237 @@
+package main
+
+import (
+	"bytes"
+	"cmp"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"regexp"
+	"slices"
+	"strings"
+
+	"go.yaml.in/yaml/v3"
+
+	"github.com/zendern/pre-commit-hooks/internal/yamlnode"
+)
+
+const (
+	allowMarker = "require-runner-arch: allow"
+
+	arm64 = "arm64"
+	x64   = "x64"
+)
+
+// policy is what the flags ask for: the architecture every job must run on, and
+// which custom labels count as being on it (nil when custom labels can't be
+// judged).
+type policy struct {
+	arch   string
+	custom *regexp.Regexp
+}
+
+// finding is one label on the wrong architecture, or a job's whole label list
+// when none of its labels says what it runs on.
+type finding struct {
+	line  int
+	job   string
+	label string
+}
+
+// run checks each workflow file in args and returns the exit code: 0 when every
+// job is on the required architecture, 1 when one is not or a file can't be
+// read, 2 for a bad flag.
+func run(args []string, stdout, stderr io.Writer) int {
+	var p policy
+	flags := flag.NewFlagSet("require-runner-arch", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.Func("arch", "the required architecture: arm64 or x64", func(v string) error {
+		if v != arm64 && v != x64 {
+			return errors.New("must be arm64 or x64")
+		}
+		p.arch = v
+		return nil
+	})
+	flags.Func("custom-label-matcher", "regular expression for custom labels on the required architecture", func(v string) (err error) {
+		p.custom, err = regexp.Compile(v)
+		return err
+	})
+	if err := flags.Parse(args); err != nil {
+		return 2
+	}
+	if p.arch == "" {
+		_, _ = fmt.Fprintln(stderr, "--arch is required: arm64 or x64")
+		return 2
+	}
+
+	failed := false
+	for _, path := range flags.Args() {
+		findings, err := checkFile(path, p)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "%s: %v\n", path, err)
+			failed = true
+			continue
+		}
+		for _, f := range findings {
+			_, _ = fmt.Fprintf(stdout, "%s:%d: job %q runs on %q\n", path, f.line, f.job, f.label)
+			failed = true
+		}
+	}
+	if !failed {
+		return 0
+	}
+	if p.arch == arm64 {
+		_, _ = fmt.Fprintln(stderr, "Use an arm64 runner label (e.g. ubuntu-24.04-arm), or put `# require-runner-arch: allow` on the runs-on line of a job that has to stay on another architecture.")
+	} else {
+		_, _ = fmt.Fprintln(stderr, "Use an x64 runner label (e.g. ubuntu-24.04), or put `# require-runner-arch: allow` on the runs-on line of a job that has to stay on another architecture.")
+	}
+	if p.custom != nil {
+		_, _ = fmt.Fprintf(stderr, "A custom runner counts as %s only when one of its labels matches --custom-label-matcher %q.\n", p.arch, p.custom)
+	}
+	return 1
+}
+
+func checkFile(path string, p policy) ([]finding, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return check(bytes.NewReader(data), p)
+}
+
+// check returns every job on the wrong architecture in one workflow file.
+func check(r io.Reader, p policy) ([]finding, error) {
+	var doc yaml.Node
+	if err := yaml.NewDecoder(r).Decode(&doc); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var findings []finding
+	_, jobs := yamlnode.Entry(yamlnode.Root(&doc), "jobs")
+	for name, job := range yamlnode.Pairs(jobs) {
+		// A job reused whole (`b: *a`) is reported at its own key.
+		var at *yaml.Node
+		if job.Kind == yaml.AliasNode {
+			at = name
+		}
+		key, runsOn := yamlnode.Entry(job, "runs-on")
+		// The marker can sit on the runs-on line itself (where YAML attaches
+		// it to the key or to a flow list), on a block-list item's line, or
+		// on a reused job's `b: *a` line (where it attaches to the alias).
+		if allowed(job) || allowed(key) || allowed(runsOn) {
+			continue
+		}
+		findings = append(findings, judge(name.Value, labels(runsOn, at), p)...)
+	}
+	return findings, nil
+}
+
+// judge returns what is wrong with one job's labels. A custom match settles the
+// job whatever else it lists, since a custom runner can carry any label.
+func judge(job string, ls []label, p policy) []finding {
+	if p.custom == nil && slices.ContainsFunc(ls, isSelfHosted) {
+		return nil
+	}
+	if p.custom != nil && slices.ContainsFunc(ls, func(l label) bool { return p.custom.MatchString(l.node.Value) }) {
+		return nil
+	}
+
+	var findings []finding
+	for _, l := range ls {
+		arch := archOf(l.node.Value)
+		if arch != "" && arch != p.arch && !labelAllowed(l) {
+			findings = append(findings, finding{line: l.at.Line, job: job, label: l.node.Value})
+		}
+	}
+	if p.custom == nil || len(ls) == 0 || slices.ContainsFunc(ls, isSettled) {
+		return findings
+	}
+	// Only custom labels and no match: report the job once, not label by label.
+	values := make([]string, 0, len(ls))
+	for _, l := range ls {
+		values = append(values, l.node.Value)
+	}
+	return []finding{{line: ls[0].at.Line, job: job, label: strings.Join(values, ", ")}}
+}
+
+// label is one runner label, after aliases are followed, and the node a finding
+// about it is reported at: the outermost alias it was reached through, a reused
+// job's key included, else the label itself. An allow marker on either counts:
+// one on the anchored label covers every use, one on an alias that use only.
+type label struct {
+	node *yaml.Node
+	at   *yaml.Node
+}
+
+func allowed(n *yaml.Node) bool {
+	return n != nil && strings.Contains(n.LineComment, allowMarker)
+}
+
+func labelAllowed(l label) bool {
+	return allowed(l.node) || allowed(l.at)
+}
+
+// labels flattens a runs-on value into its labels. at is the outermost alias
+// already passed through, or nil.
+func labels(runsOn, at *yaml.Node) []label {
+	if runsOn == nil {
+		return nil
+	}
+	switch runsOn.Kind {
+	case yaml.AliasNode:
+		return labels(runsOn.Alias, cmp.Or(at, runsOn))
+	case yaml.ScalarNode:
+		return []label{{node: runsOn, at: cmp.Or(at, runsOn)}}
+	case yaml.SequenceNode:
+		var all []label
+		for _, item := range runsOn.Content {
+			all = append(all, labels(item, at)...)
+		}
+		return all
+	default: // a {group, labels} mapping
+		_, l := yamlnode.Entry(runsOn, "labels")
+		return labels(l, at)
+	}
+}
+
+func isSelfHosted(l label) bool {
+	return l.node.Value == "self-hosted"
+}
+
+// isSettled reports whether a label needs no custom match: its architecture is
+// known, it can't be resolved, or the job is exempt through it.
+func isSettled(l label) bool {
+	v := l.node.Value
+	return archOf(v) != "" || isExpression(v) || labelAllowed(l)
+}
+
+func isExpression(v string) bool {
+	return strings.Contains(v, "${{")
+}
+
+// archOf returns the architecture of a GitHub-hosted runner label, or "" for an
+// expression or a custom label. macOS labels are arm64 except for -intel, -large
+// (but not -xlarge) and macos-13.
+func archOf(v string) string {
+	if isExpression(v) {
+		return ""
+	}
+	if strings.HasPrefix(v, "macos-") {
+		if v == "macos-13" || strings.HasSuffix(v, "-intel") || strings.HasSuffix(v, "-large") {
+			return x64
+		}
+		return arm64
+	}
+	if !strings.HasPrefix(v, "ubuntu-") && !strings.HasPrefix(v, "windows-") {
+		return ""
+	}
+	if strings.HasSuffix(v, "-arm") {
+		return arm64
+	}
+	return x64
+}
