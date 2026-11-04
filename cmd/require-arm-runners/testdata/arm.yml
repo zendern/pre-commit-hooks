@@ -1,0 +1,17 @@
+jobs:
+  a:
+    runs-on: ubuntu-24.04-arm
+  b:
+    runs-on: windows-11-arm
+  c:
+    runs-on: macos-15
+  d:
+    runs-on: macos-latest
+  e:
+    runs-on: macos-15-xlarge
+  f:
+    runs-on: my-large-runner
+  g:
+    runs-on:
+  h:
+    runs-on: macos-13-xlarge

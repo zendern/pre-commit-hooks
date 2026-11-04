@@ -1,0 +1,3 @@
+jobs:
+  a:
+    runs-on: "windows-2025" # build on windows
