@@ -62,7 +62,8 @@ func TestRunStepFindings(t *testing.T) {
 	}
 	want := missing + `:5: step #1 in job "a" has no timeout-minutes` + "\n" +
 		notBelow + `:8: step "Test" timeout-minutes 30 is not below job "a" timeout-minutes 30` + "\n" +
-		notBelow + `:11: step "Soak" timeout-minutes 45 is not below job "a" timeout-minutes 30` + "\n"
+		notBelow + `:11: step "Soak" timeout-minutes 45 is not below job "a" timeout-minutes 30` + "\n" +
+		notBelow + `:14: warning: step "Lint" in job "a" timeout-minutes "${{ inputs.lint-timeout }}" is an expression this hook can't check` + "\n"
 	if stdout.String() != want {
 		t.Errorf("stdout %q, want %q", stdout.String(), want)
 	}
@@ -97,6 +98,43 @@ func TestRunMissingFileAlone(t *testing.T) {
 	}
 }
 
+func TestRunExpressionWarns(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	job := filepath.Join("testdata", "expression-timeout.yml")
+	step := filepath.Join("testdata", "step-timeout-expression.yml")
+
+	code := run([]string{"--steps", job, step}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("code %d, want 0", code)
+	}
+	want := job + `:2: warning: job "a" timeout-minutes "${{ inputs.timeout }}" is an expression this hook can't check` + "\n" +
+		step + `:5: warning: step #1 in job "a" timeout-minutes "${{ inputs.timeout }}" is an expression this hook can't check` + "\n"
+	if stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout.String(), want)
+	}
+	if stderr.String() != "" {
+		t.Errorf("stderr %q, want none", stderr.String())
+	}
+}
+
+func TestRunExpressionAndMissing(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join("testdata", "expression-and-missing.yml")
+
+	code := run([]string{path}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("code %d, want 1", code)
+	}
+	if !strings.Contains(stdout.String(), `:4: job "b" has no timeout-minutes`) {
+		t.Errorf("stdout %q, want the missing timeout", stdout.String())
+	}
+	if stderr.String() != hint {
+		t.Errorf("stderr %q, want %q", stderr.String(), hint)
+	}
+}
+
 func TestRunUnknownFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
@@ -120,7 +158,12 @@ func TestCheck(t *testing.T) {
 	}{
 		{"job-missing-timeout.yml", false, []string{"a - 2"}},
 		{"job-with-timeout.yml", false, nil},
-		{"expression-timeout.yml", false, nil},
+		{"expression-timeout.yml", false, []string{"warn a - 2"}},
+		{"expression-allow.yml", false, nil},
+		{"alias-expression.yml", false, []string{"warn a - 4"}},
+		{"step-timeout-expression.yml", false, nil},
+		{"step-timeout-expression.yml", true, []string{"warn a #1 5"}},
+		{"expression-and-missing.yml", false, []string{"warn a - 2", "b - 4"}},
 		{"empty-timeout.yml", false, []string{"a - 2"}},
 		{"several-jobs.yml", false, []string{"a - 2", "c - 7"}},
 		{"reusable-workflow-call.yml", false, nil},
@@ -129,9 +172,9 @@ func TestCheck(t *testing.T) {
 		{"step-position-label.yml", true, []string{"a #1 5"}},
 		{"job-and-steps-both-missing.yml", true, []string{"a - 2", "a #1 4"}},
 		{"allow-marker.yml", true, nil},
-		{"step-timeout-not-below-job.yml", true, []string{`a "Test" 8 30>=30`, `a "Soak" 11 45>=30`}},
+		{"step-timeout-not-below-job.yml", true, []string{`a "Test" 8 30>=30`, `a "Soak" 11 45>=30`, `warn a "Lint" 14`}},
 		{"step-timeout-not-below-job.yml", false, nil},
-		{"job-timeout-expression.yml", true, nil},
+		{"job-timeout-expression.yml", true, []string{"warn a - 2"}},
 		{"no-jobs.yml", false, nil},
 		{"empty.yml", false, nil},
 		{"comment-only.yml", false, nil},
@@ -163,6 +206,9 @@ func TestCheck(t *testing.T) {
 				g := fmt.Sprint(f.job, " ", step, " ", f.line)
 				if f.stepTimeout != 0 {
 					g += fmt.Sprintf(" %g>=%g", f.stepTimeout, f.jobTimeout)
+				}
+				if f.expression != "" {
+					g = "warn " + g
 				}
 				got = append(got, g)
 			}

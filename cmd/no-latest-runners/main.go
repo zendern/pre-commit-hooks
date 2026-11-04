@@ -5,8 +5,8 @@
 //
 // It reads jobs.<id>.runs-on in every form: a label, a list of labels, or a
 // {group, labels} object. Labels set through an expression (${{ ... }}) can't be
-// resolved and are skipped. A label whose line ends in
-// `# no-latest-runners: allow` is exempt.
+// resolved, so they get a warning and don't fail the hook. A label whose line
+// ends in `# no-latest-runners: allow` is exempt.
 package main
 
 import "os"

@@ -9,9 +9,5 @@ jobs:
     runs-on: macos-latest
   e:
     runs-on: macos-15-xlarge
-  f:
-    runs-on: my-large-runner
-  g:
-    runs-on:
   h:
     runs-on: macos-13-xlarge

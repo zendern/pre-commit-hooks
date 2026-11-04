@@ -19,13 +19,15 @@ import (
 const allowMarker = "require-timeouts: allow"
 
 // finding is one job or step with no timeout (step is empty for a job), or,
-// when stepTimeout is set, a step whose timeout is not below its job's.
+// when stepTimeout is set, a step whose timeout is not below its job's, or, when
+// expression is set, a timeout the hook can't check, which is only a warning.
 type finding struct {
 	line        int
 	job         string
 	step        string
 	stepTimeout float64
 	jobTimeout  float64
+	expression  string
 }
 
 // run checks each workflow file in args and returns the exit code: 0 when every
@@ -49,7 +51,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		for _, f := range findings {
 			_, _ = fmt.Fprintln(stdout, describe(path, f))
-			failed = true
+			if f.expression == "" {
+				failed = true
+			}
 		}
 	}
 	if !failed {
@@ -64,6 +68,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // describe is the one-line report for a finding.
 func describe(path string, f finding) string {
+	if f.expression != "" && f.step == "" {
+		return fmt.Sprintf("%s:%d: warning: job %q timeout-minutes %q is an expression this hook can't check",
+			path, f.line, f.job, f.expression)
+	}
+	if f.expression != "" {
+		return fmt.Sprintf("%s:%d: warning: step %s in job %q timeout-minutes %q is an expression this hook can't check",
+			path, f.line, f.step, f.job, f.expression)
+	}
 	if f.stepTimeout != 0 {
 		return fmt.Sprintf("%s:%d: step %s timeout-minutes %g is not below job %q timeout-minutes %g",
 			path, f.line, f.step, f.stepTimeout, f.job, f.jobTimeout)
@@ -109,6 +121,9 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 		if !hasTimeout(job) {
 			findings = append(findings, finding{line: name.Line, job: name.Value})
 		}
+		if e := timeoutExpression(job); e != "" {
+			findings = append(findings, finding{line: name.Line, job: name.Value, expression: e})
+		}
 		if !steps {
 			continue
 		}
@@ -135,6 +150,10 @@ func check(r io.Reader, steps bool) ([]finding, error) {
 				findings = append(findings, finding{line: line, job: name.Value, step: stepLabel(step, i)})
 				continue
 			}
+			if e := timeoutExpression(step); e != "" {
+				findings = append(findings, finding{line: line, job: name.Value, step: stepLabel(step, i), expression: e})
+				continue
+			}
 			if stepTimeout, ok := literalTimeout(step); ok && jobLiteral && jobTimeout > 0 && stepTimeout >= jobTimeout {
 				findings = append(findings, finding{
 					line: line, job: name.Value, step: stepLabel(step, i),
@@ -152,6 +171,17 @@ func hasTimeout(m *yaml.Node) bool {
 	_, v := yamlnode.Entry(m, "timeout-minutes")
 	v = yamlnode.Resolve(v)
 	return v != nil && v.Tag != "!!null"
+}
+
+// timeoutExpression returns a job's or step's timeout-minutes when it is set
+// through an expression, else "".
+func timeoutExpression(m *yaml.Node) string {
+	_, v := yamlnode.Entry(m, "timeout-minutes")
+	v = yamlnode.Resolve(v)
+	if v == nil || !strings.Contains(v.Value, "${{") {
+		return ""
+	}
+	return v.Value
 }
 
 // literalTimeout returns a job's or step's timeout-minutes when it is a plain

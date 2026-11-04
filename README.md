@@ -15,6 +15,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
 - [Usage](#usage)
 - [Hooks](#hooks)
   - [GitHub Actions](#github-actions)
+    - [Warnings](#warnings)
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
     - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
@@ -59,6 +60,21 @@ allow marker on the anchored value covers every use of it; one on an alias's
 line covers that use only. Merge keys (`<<: *name`) are not followed: GitHub
 does not support them.
 
+#### Warnings
+
+Some things a hook can't check, such as a label set through an expression. It
+prints a warning with the file and line, and doesn't fail because of it:
+
+```
+.github/workflows/ci.yml:12: warning: job "build" runs on "${{ matrix.os }}", an expression this hook can't check
+```
+
+pre-commit and prek only have pass or fail, and hide a passing hook's output, so
+these hooks set `verbose: true`. To silence warnings:
+
+- One job or step: use the hook's allow marker, described under each hook.
+- A whole hook: set `verbose: false` on it in your `.pre-commit-config.yaml`.
+
 #### `no-latest-runners`
 
 Fails when a workflow job runs on a floating runner label such as
@@ -72,9 +88,8 @@ Pin a version instead:
 It parses each workflow and reads `jobs.<id>.runs-on` in every form: a label, a
 list of labels, or a `group`/`labels` object.
 
-> [!WARNING]
-> Labels set through an expression
-> (`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
+Labels set through an expression (`runs-on: ${{ matrix.os }}`) can't be resolved,
+so they get a [warning](#warnings).
 
 Failure output
 
@@ -116,11 +131,10 @@ Jobs that call a reusable workflow (`jobs.<id>.uses`) are skipped: GitHub
 doesn't accept `timeout-minutes` there, so the called workflow's own jobs need
 it.
 
-> [!WARNING]
-> Timeouts set through an expression (`timeout-minutes: ${{ inputs.timeout }}`)
-> can't be resolved, so the hook can't check their value. They count as set,
-> and they are skipped when step and job timeouts are compared. If one resolves
-> to an empty or oversized value at run time, the hook can't catch it.
+Timeouts set through an expression (`timeout-minutes: ${{ inputs.timeout }}`)
+can't be resolved, so they get a [warning](#warnings). They count as set, and
+they are skipped when step and job timeouts are compared. If one resolves to an
+empty or oversized value at run time, the hook can't catch it.
 
 Failure output
 
@@ -197,12 +211,12 @@ The hook knows GitHub's own runner labels:
 | `macos-*-intel`, `macos-*-large`, `macos-13` | x64 |
 | other `macos-*` | arm64 |
 
-It can't tell the architecture of any other label, so by default those labels
-pass and any job with the `self-hosted` label is skipped.
+It can't tell the architecture of any other label, so by default a job with only
+those labels, or with the `self-hosted` label, passes with a
+[warning](#warnings).
 
-> [!WARNING]
-> Labels set through an expression
-> (`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
+Labels set through an expression (`runs-on: ${{ matrix.os }}`) can't be resolved,
+so they get a warning too, even with `--custom-label-matcher` set.
 
 Failure output
 
@@ -227,7 +241,7 @@ are not case-sensitive, so add `(?i)` if yours vary. With this flag set:
 
 - A job passes when any of its labels matches.
 - A job with only custom labels fails when none of them match, and self-hosted
-  jobs are no longer skipped.
+  jobs no longer just warn.
 
 ##### Exclusions
 
