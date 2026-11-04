@@ -1,0 +1,5 @@
+jobs:
+  a:
+    runs-on: ${{ matrix.os }}
+  b:
+    runs-on: ubuntu-latest

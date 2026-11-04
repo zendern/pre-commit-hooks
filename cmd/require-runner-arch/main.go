@@ -5,10 +5,11 @@
 //
 // It reads jobs.<id>.runs-on in every form: a label, a list of labels, or a
 // {group, labels} object. Only GitHub's own labels have a known architecture.
-// Other labels pass and a job with the self-hosted label is skipped, unless
-// --custom-label-matcher says which custom labels are on the required architecture.
-// Labels set through an expression (${{ ... }}) can't be resolved and are
-// skipped. A label whose line ends in `# require-runner-arch: allow` is exempt.
+// Other labels and jobs with the self-hosted label get a warning and don't fail
+// the hook, unless --custom-label-matcher says which custom labels are on the
+// required architecture. Labels set through an expression (${{ ... }}) can't be
+// resolved, so they get a warning either way. A label whose line ends in
+// `# require-runner-arch: allow` is exempt.
 package main
 
 import "os"

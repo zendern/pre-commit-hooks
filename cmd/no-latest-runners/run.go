@@ -16,15 +16,18 @@ import (
 
 const allowMarker = "no-latest-runners: allow"
 
-// finding is one floating label: where it is and what it is.
+// finding is one floating label, or with warn set one the hook can't check:
+// where it is and what it is.
 type finding struct {
 	line  int
 	job   string
 	label string
+	warn  bool
 }
 
 // run checks each workflow file in args and returns the exit code: 0 when
-// every runner label is pinned, 1 when one floats or a file can't be read.
+// every runner label is pinned or can't be checked, 1 when one floats or a file
+// can't be read. A label set through an expression gets a warning, not a failure.
 func run(args []string, stdout, stderr io.Writer) int {
 	failed := false
 	for _, path := range args {
@@ -35,6 +38,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 		for _, f := range findings {
+			if f.warn {
+				_, _ = fmt.Fprintf(stdout, "%s:%d: warning: job %q runs on %q, an expression this hook can't check\n", path, f.line, f.job, f.label)
+				continue
+			}
 			_, _ = fmt.Fprintf(stdout, "%s:%d: job %q runs on %q\n", path, f.line, f.job, f.label)
 			failed = true
 		}
@@ -80,8 +87,12 @@ func check(r io.Reader) ([]finding, error) {
 			continue
 		}
 		for _, l := range labels(runsOn, at) {
-			if isFloating(l.node) && !allowed(l.node) && !allowed(l.at) {
-				findings = append(findings, finding{line: l.at.Line, job: name.Value, label: l.node.Value})
+			if allowed(l.node) || allowed(l.at) {
+				continue
+			}
+			expression := strings.Contains(l.node.Value, "${{")
+			if expression || isFloating(l.node) {
+				findings = append(findings, finding{line: l.at.Line, job: name.Value, label: l.node.Value, warn: expression})
 			}
 		}
 	}
@@ -125,7 +136,5 @@ func labels(runsOn, at *yaml.Node) []label {
 }
 
 func isFloating(label *yaml.Node) bool {
-	return label.Kind == yaml.ScalarNode &&
-		strings.HasSuffix(label.Value, "-latest") &&
-		!strings.Contains(label.Value, "${{")
+	return label.Kind == yaml.ScalarNode && strings.HasSuffix(label.Value, "-latest")
 }

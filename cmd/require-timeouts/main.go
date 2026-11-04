@@ -6,6 +6,9 @@
 // timeout must be below its job's: the job is cancelled first, so a step
 // timeout at or above it can never fire.
 //
+// A timeout set through an expression (${{ ... }}) can't be resolved, so it gets
+// a warning and doesn't fail the hook.
+//
 // Jobs that call a reusable workflow (jobs.<id>.uses) are skipped: GitHub does
 // not accept timeout-minutes there, so the called workflow's jobs carry it. A
 // job or step whose first line ends in `# require-timeouts: allow` is exempt; on

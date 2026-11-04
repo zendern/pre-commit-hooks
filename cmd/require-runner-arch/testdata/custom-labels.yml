@@ -31,3 +31,5 @@ jobs:
       labels: arc-x64-big
   n:
     uses: ./.github/workflows/ci.yml
+  o:
+    runs-on: [self-hosted, "${{ matrix.os }}"]
