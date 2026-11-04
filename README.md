@@ -17,7 +17,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
   - [GitHub Actions](#github-actions)
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
-    - [`require-arm-runners`](#require-arm-runners): fail on x64 GitHub-hosted runner labels
+    - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
 - [Development](#development)
   - [Releases](#releases)
 
@@ -32,7 +32,8 @@ repos:
     hooks:
       - id: no-latest-runners
       - id: require-timeouts
-      - id: require-arm-runners
+      - id: require-runner-arch
+        args: [--arch=arm64]
 ```
 
 > [!NOTE]
@@ -171,22 +172,33 @@ worst case, and the job timeout caps the whole run.
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
-#### `require-arm-runners`
+#### `require-runner-arch`
 
-Fails when a workflow job runs on an x64 GitHub-hosted runner label. A standard
-arm64 Linux runner costs $0.005 per minute against $0.006 for x64, so included
-usage in a private repository lasts 20% longer. See GitHub's
-[runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing).
-Public repositories don't pay for standard runners, so only add this hook to one
-if you want arm64 for another reason.
+Fails when a workflow job runs on a different CPU architecture from the one you
+require. `--arch` is required, and takes `arm64` or `x64`.
 
-| Label | Result |
+```yaml
+    hooks:
+      - id: require-runner-arch
+        args: [--arch=arm64]
+```
+
+A standard arm64 Linux runner costs $0.005 per minute against $0.006 for x64, so
+`--arch=arm64` makes included usage in a private repository last 20% longer. See
+GitHub's [runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing).
+`--arch=x64` suits a project that ships amd64 and wants its CI to match.
+
+The hook knows GitHub's own runner labels:
+
+| Label | Architecture |
 | --- | --- |
-| `ubuntu-*`, `windows-*` | fails, unless it ends in `-arm` |
-| `macos-*-intel`, `macos-*-large`, `macos-13` | fails |
-| any other `macos-*` | passes |
-| any other label | passes, because the hook can't tell a custom runner's architecture |
-| any job with the `self-hosted` label | skipped |
+| `ubuntu-*-arm`, `windows-*-arm` | arm64 |
+| other `ubuntu-*`, `windows-*` | x64 |
+| `macos-*-intel`, `macos-*-large`, `macos-13` | x64 |
+| other `macos-*` | arm64 |
+
+It can't tell the architecture of any other label, so by default those labels
+pass and any job with the `self-hosted` label is skipped.
 
 > [!WARNING]
 > Labels set through an expression
@@ -198,16 +210,35 @@ Failure output
 .github/workflows/ci.yml:12: job "build" runs on "ubuntu-24.04"
 ```
 
+##### Custom runners
+
+If you have larger or self-hosted runners with your own labels, tell the hook
+which ones are on the required architecture with a
+[Go regular expression](https://pkg.go.dev/regexp/syntax):
+
+```yaml
+    hooks:
+      - id: require-runner-arch
+        args: [--arch=arm64, --custom-label-matcher=^arc-arm-]
+```
+
+The expression is searched for in each label, so anchor it, and GitHub's labels
+are not case-sensitive, so add `(?i)` if yours vary. With this flag set:
+
+- A job passes when any of its labels matches.
+- A job with only custom labels fails when none of them match, and self-hosted
+  jobs are no longer skipped.
+
 ##### Exclusions
 
-Some jobs have to stay on x64, such as one that builds `linux/amd64` images
-without emulation.
+Some jobs have to stay on another architecture, such as one that builds
+`linux/amd64` images without emulation.
 
-- One job: put `# require-arm-runners: allow` on its `runs-on` line (or on a
+- One job: put `# require-runner-arch: allow` on its `runs-on` line (or on a
   list item's line).
 
   ```yaml
-  runs-on: ubuntu-24.04 # require-arm-runners: allow
+  runs-on: ubuntu-24.04 # require-runner-arch: allow
   ```
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.

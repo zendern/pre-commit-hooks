@@ -1,0 +1,33 @@
+jobs:
+  a:
+    runs-on: arc-arm-small
+  b:
+    runs-on: arc-x64-small
+  c:
+    runs-on: [self-hosted, linux, arc-arm-big]
+  d:
+    runs-on: [self-hosted, linux, x64]
+  e:
+    runs-on: ubuntu-24.04-arm
+  f:
+    runs-on: ubuntu-24.04
+  g:
+    runs-on: macos-15
+  h:
+    runs-on: ${{ matrix.os }}
+  i:
+    runs-on: [self-hosted, ubuntu-24.04, arc-arm-big]
+  j:
+    runs-on: [self-hosted, ubuntu-24.04]
+  k:
+    runs-on: arc-x64-small # require-runner-arch: allow
+  l:
+    runs-on:
+      - self-hosted
+      - arc-x64-small # require-runner-arch: allow
+  m:
+    runs-on:
+      group: big
+      labels: arc-x64-big
+  n:
+    uses: ./.github/workflows/ci.yml

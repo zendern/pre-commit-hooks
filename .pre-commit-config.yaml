@@ -65,6 +65,11 @@ repos:
         entry: go run ./cmd/require-timeouts
         language: system
         files: ^\.github/workflows/.*\.ya?ml$
+      - id: require-runner-arch
+        name: require-runner-arch (this checkout)
+        entry: go run ./cmd/require-runner-arch --arch=x64
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
       # The manifest is what every consuming repo installs from, so a bad
       # entry or language breaks them all.
       - id: validate-manifest
