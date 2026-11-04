@@ -47,6 +47,7 @@ type finding struct {
 // a file can't be read, 2 for a bad flag.
 func run(args []string, stdout, stderr io.Writer) int {
 	var p policy
+	var matcher string
 	flags := flag.NewFlagSet("require-runner-arch", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.Func("arch", "the required architecture: arm64 or x64", func(v string) error {
@@ -57,7 +58,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return nil
 	})
 	flags.Func("custom-label-matcher", "regular expression for custom labels on the required architecture", func(v string) (err error) {
-		p.custom, err = regexp.Compile(v)
+		matcher = v
+		// GitHub's labels are case-insensitive.
+		p.custom, err = regexp.Compile("(?i)" + v)
 		return err
 	})
 	if err := flags.Parse(args); err != nil {
@@ -94,7 +97,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "Use an x64 runner label (e.g. ubuntu-24.04), or put `# require-runner-arch: allow` on the runs-on line of a job that has to stay on another architecture.")
 	}
 	if p.custom != nil {
-		_, _ = fmt.Fprintf(stderr, "A custom runner counts as %s only when one of its labels matches --custom-label-matcher %q.\n", p.arch, p.custom)
+		_, _ = fmt.Fprintf(stderr, "A custom runner counts as %s only when one of its labels matches --custom-label-matcher %q.\n", p.arch, matcher)
 	}
 	return 1
 }
@@ -219,7 +222,7 @@ func labels(runsOn, at *yaml.Node) []label {
 }
 
 func isSelfHosted(l label) bool {
-	return l.node.Value == "self-hosted"
+	return strings.EqualFold(l.node.Value, "self-hosted")
 }
 
 // isSettled reports whether a label says all the hook needs about its job: its
@@ -234,11 +237,12 @@ func isExpression(v string) bool {
 
 // archOf returns the architecture of a GitHub-hosted runner label, or "" for an
 // expression or a custom label. macOS labels are arm64 except for -intel, -large
-// (but not -xlarge) and macos-13.
+// (but not -xlarge) and macos-13. Case is ignored because GitHub's labels do.
 func archOf(v string) string {
 	if isExpression(v) {
 		return ""
 	}
+	v = strings.ToLower(v)
 	if strings.HasPrefix(v, "macos-") {
 		if v == "macos-13" || strings.HasSuffix(v, "-intel") || strings.HasSuffix(v, "-large") {
 			return x64
