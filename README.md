@@ -17,6 +17,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
   - [GitHub Actions](#github-actions)
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
+    - [`require-arm-runners`](#require-arm-runners): fail on x64 GitHub-hosted runner labels
 - [Development](#development)
   - [Releases](#releases)
 
@@ -31,6 +32,7 @@ repos:
     hooks:
       - id: no-latest-runners
       - id: require-timeouts
+      - id: require-arm-runners
 ```
 
 > [!NOTE]
@@ -47,7 +49,7 @@ installed.
 
 These hooks check workflow files in `.github/workflows/`.
 
-Both follow [YAML anchors and aliases](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
+All of them follow [YAML anchors and aliases](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations)
 (`&name` / `*name`), which GitHub Actions supports, wherever a value can be
 one: a reused job (`alt-test: *base_job`), `runs-on`, its labels, `steps`, a
 step, or `timeout-minutes`. A finding about an aliased value is reported where
@@ -165,6 +167,47 @@ worst case, and the job timeout caps the whole run.
       steps:
         - name: Soak test # require-timeouts: allow
           run: ./soak.sh
+  ```
+
+- Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
+
+#### `require-arm-runners`
+
+Fails when a workflow job runs on an x64 GitHub-hosted runner label. A standard
+arm64 Linux runner costs $0.005 per minute against $0.006 for x64, so included
+usage in a private repository lasts 20% longer. See GitHub's
+[runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing).
+Public repositories don't pay for standard runners, so only add this hook to one
+if you want arm64 for another reason.
+
+| Label | Result |
+| --- | --- |
+| `ubuntu-*`, `windows-*` | fails, unless it ends in `-arm` |
+| `macos-*-intel`, `macos-*-large`, `macos-13` | fails |
+| any other `macos-*` | passes |
+| any other label | passes, because the hook can't tell a custom runner's architecture |
+| any job with the `self-hosted` label | skipped |
+
+> [!WARNING]
+> Labels set through an expression
+> (`runs-on: ${{ matrix.os }}`) can't be resolved and are skipped.
+
+Failure output
+
+```
+.github/workflows/ci.yml:12: job "build" runs on "ubuntu-24.04"
+```
+
+##### Exclusions
+
+Some jobs have to stay on x64, such as one that builds `linux/amd64` images
+without emulation.
+
+- One job: put `# require-arm-runners: allow` on its `runs-on` line (or on a
+  list item's line).
+
+  ```yaml
+  runs-on: ubuntu-24.04 # require-arm-runners: allow
   ```
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.

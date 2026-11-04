@@ -10,3 +10,9 @@
   entry: require-timeouts
   language: golang
   files: ^\.github/workflows/.*\.ya?ml$
+- id: require-arm-runners
+  name: require arm64 runners
+  description: Fail on x64 GitHub-hosted runner labels (e.g. ubuntu-24.04), because arm64 runners cost less per minute in private repositories.
+  entry: require-arm-runners
+  language: golang
+  files: ^\.github/workflows/.*\.ya?ml$

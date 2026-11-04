@@ -1,0 +1,11 @@
+jobs:
+  a:
+    runs-on: [self-hosted, ubuntu-24.04]
+  b:
+    runs-on: self-hosted
+  c:
+    runs-on:
+      - ubuntu-24.04
+      - self-hosted
+  d:
+    runs-on: [not-self-hosted, ubuntu-24.04]
