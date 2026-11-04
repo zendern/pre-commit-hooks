@@ -1,0 +1,8 @@
+jobs:
+  a:
+    timeout-minutes: 30
+    steps:
+      - run: make
+        timeout-minutes: ${{ inputs.timeout }}
+      - run: other # require-timeouts: allow
+        timeout-minutes: ${{ inputs.timeout }}
