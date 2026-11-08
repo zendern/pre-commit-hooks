@@ -22,7 +22,7 @@
 # gh-actions-lock is a Go module, so prek and pre-commit build it with `go
 # install` at the pinned version (the Go checksum database rejects a moved
 # tag). renovate.json bumps it through the `# renovate:` comment.
-- id: actions-lock
+- id: gh-actions-lock-verify-local
   name: workflow lockfile coverage
   description: Offline check that every action in .github/workflows/ has an entry in .github/workflows/actions.lock. Regenerate the lockfile with `gh actions-lock`.
   entry: gh-actions-lock --verify-local
@@ -33,9 +33,9 @@
   # Workflows, the lockfile, and in-repo actions reached through `$/`.
   files: (^\.github/workflows/|(^|/)action\.ya?ml$)
   pass_filenames: false
-- id: actions-lock-verify
+- id: gh-actions-lock-verify
   name: workflow lockfile provenance
-  description: Check .github/workflows/actions.lock against GitHub, as the runner does. Needs GH_TOKEN. Manual stage, so commits stay offline; CI runs `prek run --hook-stage manual actions-lock-verify --all-files`.
+  description: Check .github/workflows/actions.lock against GitHub, as the runner does. Needs GH_TOKEN. Manual stage, so commits stay offline; CI runs `prek run --hook-stage manual gh-actions-lock-verify --all-files`.
   entry: gh-actions-lock --verify
   language: golang
   additional_dependencies:

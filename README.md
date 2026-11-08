@@ -19,8 +19,8 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
     - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
-    - [`actions-lock`](#actions-lock): every action has a workflow lockfile entry (offline, on commit)
-    - [`actions-lock-verify`](#actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
+    - [`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local): every action has a workflow lockfile entry (offline, on commit)
+    - [`gh-actions-lock-verify`](#gh-actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
 - [Development](#development)
   - [Releases](#releases)
 
@@ -37,8 +37,8 @@ repos:
       - id: require-timeouts
       - id: require-runner-arch
         args: [--arch=arm64]
-      - id: actions-lock
-      - id: actions-lock-verify # manual stage: run in CI with GH_TOKEN
+      - id: gh-actions-lock-verify-local
+      - id: gh-actions-lock-verify # manual stage: run in CI with GH_TOKEN
 ```
 
 > [!NOTE]
@@ -264,7 +264,7 @@ Some jobs have to stay on another architecture, such as one that builds
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
-#### `actions-lock`
+#### `gh-actions-lock-verify-local`
 
 Fails when an action used in `.github/workflows/` has no entry in the
 [workflow lockfile](https://github.com/github/gh-actions-lock)
@@ -274,7 +274,7 @@ including the actions those actions call, to a commit. It runs
 
 It runs when a workflow, the lockfile, or an `action.yml` changes (in-repo
 actions reached through `$/` are locked too). It only checks that every action
-has an entry, not that the entries are genuine; [`actions-lock-verify`](#actions-lock-verify)
+has an entry, not that the entries are genuine; [`gh-actions-lock-verify`](#gh-actions-lock-verify)
 does that.
 
 Regenerate the lockfile after editing a `uses:` line:
@@ -290,7 +290,7 @@ Failure output
 Run without --verify-local to resolve and pin missing actions.
 ```
 
-#### `actions-lock-verify`
+#### `gh-actions-lock-verify`
 
 Fails when an entry in `.github/workflows/actions.lock` doesn't match GitHub:
 a tag that moved, a locked commit no longer in the action's history, a changed
@@ -304,12 +304,12 @@ runs on commit. Run it in CI:
       - name: Verify the workflow lockfile
         env:
           GH_TOKEN: ${{ github.token }}
-        run: prek run --hook-stage manual actions-lock-verify --all-files
+        run: prek run --hook-stage manual gh-actions-lock-verify --all-files
 ```
 
 Naming the hook id makes that command fail when a repo hasn't configured the
 hook, so CI can't skip the check silently. Locally:
-`GH_TOKEN=$(gh auth token) prek run --hook-stage manual actions-lock-verify --all-files`.
+`GH_TOKEN=$(gh auth token) prek run --hook-stage manual gh-actions-lock-verify --all-files`.
 
 Failure output
 
@@ -324,7 +324,7 @@ Failure output
 ##### Choosing when they run
 
 The two hooks are separate so each is safe to list with no extra config:
-`actions-lock` on commit, `actions-lock-verify` only when asked. Both are
+`gh-actions-lock-verify-local` on commit, `gh-actions-lock-verify` only when asked. Both are
 read-only. (`gh-actions-lock` with no flag rewrites workflows and the lockfile,
 so neither hook runs it that way.)
 
@@ -333,8 +333,8 @@ provenance before every push, with `GH_TOKEN` set in your shell:
 
 ```yaml
     hooks:
-      - id: actions-lock
-      - id: actions-lock-verify
+      - id: gh-actions-lock-verify-local
+      - id: gh-actions-lock-verify
         stages: [pre-push]
 ```
 
@@ -352,10 +352,10 @@ comment; Go resolves a tagged commit to that version:
 
 ```yaml
     hooks:
-      - id: actions-lock
+      - id: gh-actions-lock-verify-local
         additional_dependencies:
           - github.com/github/gh-actions-lock/cmd/gh-actions-lock@759f9c2d44e8599fa5b29224e5a30c58b3555211 # v0.4.0
-      - id: actions-lock-verify
+      - id: gh-actions-lock-verify
         additional_dependencies:
           - github.com/github/gh-actions-lock/cmd/gh-actions-lock@759f9c2d44e8599fa5b29224e5a30c58b3555211 # v0.4.0
 ```
