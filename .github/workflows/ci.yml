@@ -20,10 +20,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@v7.0.0
         id: setup-go
         with:
           go-version-file: go.mod
@@ -35,7 +35,7 @@ jobs:
       # Restoring ./bin lets Task's status check in go-install see the right
       # module version and Go toolchain and skip the build. A bumped pin in
       # Taskfile.yml, go.mod or the Go version changes the key and rebuilds.
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      - uses: actions/cache@v5.1.0
         with:
           path: bin
           key: tools-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.mod', 'Taskfile.yml') }}
@@ -49,11 +49,18 @@ jobs:
       # the manifest check, tests with the coverage gate, go mod tidy,
       # govulncheck, and go-licenses. The token turns on zizmor's online audits.
       - name: Run prek hooks
-        uses: j178/prek-action@af4d4fcb6922b8e6f65c0426947125fcc38794ce # v3.0.2
+        uses: j178/prek-action@v3.0.2
         env:
           GH_TOKEN: ${{ github.token }}
         with:
           prek-version: ${{ steps.prek.outputs.version }}
+      # The lockfile against GitHub, as the runner checks it: a manual-stage
+      # hook, so commits stay offline. Naming the id fails if it isn't
+      # configured.
+      - name: Verify the workflow lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: prek run --hook-stage manual gh-actions-lock-verify --all-files
 
   # Single required check (the shared default-branch ruleset requires a passing
   # workflow-summary).
@@ -64,7 +71,7 @@ jobs:
     timeout-minutes: 5
     permissions: {}
     steps:
-      - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
+      - uses: re-actors/alls-green@v1.3.0
         with:
           jobs: ${{ toJSON(needs) }}
 
@@ -84,12 +91,12 @@ jobs:
       group: release
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
           # svu reads every commit since the last tag.
           fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - uses: actions/setup-go@v7.0.0
         with:
           go-version-file: go.mod
           # A release job must not restore a cache a PR run could have written.

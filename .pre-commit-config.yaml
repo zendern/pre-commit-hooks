@@ -31,9 +31,18 @@ repos:
   # GitHub Actions security audit of the workflows. Offline unless GH_TOKEN is
   # set, as in CI, which turns on the online audits.
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: d25b2b1dc80689fb633f21f6978bba69871181d3 # frozen: v1.31.0
+    rev: 06a39750ec31860bb44f2acf67182c40016cd1e7 # frozen: v1.32.0
     hooks:
       - id: zizmor
+
+  # This repo's own lockfile hooks, from the latest release, as any consumer
+  # uses them. They are only manifest entries (no code here), which the
+  # validate-manifest hook checks; Renovate bumps the rev after each release.
+  - repo: https://github.com/zendern/pre-commit-hooks
+    rev: cb3feef6aa5b1864d521e8bc84acc35391146974 # frozen: v1.3.0
+    hooks:
+      - id: gh-actions-lock-verify-local
+      - id: gh-actions-lock-verify
 
   - repo: local
     hooks:

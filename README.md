@@ -384,7 +384,7 @@ task setup   # alias: task install-tools
 
 `task setup` installs every other tool into `./bin` at the versions pinned in
 `Taskfile.yml` ([prek](https://prek.j178.dev), golangci-lint, govulncheck,
-go-licenses, go-test-coverage, gremlins, [ratchet](https://github.com/sethvargo/ratchet)),
+go-licenses, go-test-coverage, gremlins),
 then the git hooks. Run it in the
 main checkout, not a worktree: worktrees share its hooks, and the hooks run the
 prek in the `./bin` of whichever checkout installed them. Every `go` command
@@ -393,7 +393,7 @@ downloads when yours is a different version.
 
 Every check lives in `.pre-commit-config.yaml` and runs on commit: file
 hygiene, zizmor, golangci-lint (with gofumpt and goimports), this repo's own
-hooks on its workflows, the manifest check, tests with a 95% coverage gate
+hooks on its workflows (including the lockfile check), the manifest check, tests with a 95% coverage gate
 (`.testcoverage.yml`), `go mod tidy`, govulncheck, and go-licenses. Commit
 messages are checked against Conventional Commits. CI runs the same hooks on
 every file. Mutation testing (gremlins, 95% efficacy and mutant coverage in
@@ -402,14 +402,14 @@ the packages a PR changes, and on the whole module weekly. A tagless
 `switch { case cond: }` fails lint (`tools/lint/rules.go`), because gremlins
 cannot mutate case conditions; write `if` statements.
 
-Every action in a workflow must be pinned to a commit SHA: zizmor's
-`unpinned-uses` audit fails a tag like `actions/checkout@v5`, on commit and in
-CI. After adding or changing a `uses:` line, run `task pin` (ratchet), which
-rewrites it to `actions/checkout@<sha> # ratchet:actions/checkout@v5` and leaves
-lines already pinned alone. It looks refs up through the GitHub API, so set
-`GITHUB_TOKEN` (for example `GITHUB_TOKEN=$(gh auth token) task pin`) to avoid
-the anonymous rate limit. Renovate then keeps the pins current; it reads both
-the `# ratchet:` and `# vX.Y.Z` comment styles.
+Workflows reference actions by tag, and `.github/workflows/actions.lock` pins
+every one of them, including the actions they call, to a commit. After adding
+or changing a `uses:` line, run `task lock` (`gh actions-lock`, which needs the
+[extension](https://github.com/github/gh-actions-lock) and a `gh` login). The
+[`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local) hook fails a
+commit whose lockfile is incomplete, and CI runs
+[`gh-actions-lock-verify`](#gh-actions-lock-verify) against GitHub. Renovate
+relocks when it updates an action.
 
 ```sh
 task check          # every hook on every file (what CI runs)
@@ -420,8 +420,7 @@ task fmt            # gofumpt and goimports
 task mutate         # mutation testing (mutate-diff BASE=<ref> for changed packages)
 task vuln           # govulncheck
 task licenses       # dependency license check
-task pin            # pin new or changed GitHub Actions to a commit SHA (ratchet)
-task pin-check      # fail on any unpinned action or container image (ratchet lint)
+task lock           # regenerate .github/workflows/actions.lock after editing a uses: line
 task next-version   # the version merging this branch would release (nothing if none; CI's release job uses it)
 ```
 

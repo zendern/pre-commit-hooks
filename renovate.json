@@ -3,6 +3,10 @@
   "extends": [
     "config:recommended"
   ],
+  "pre-commit": {
+    "description": "Bumps each hook repo's frozen rev, including this repo's own lockfile hooks after a release.",
+    "enabled": true
+  },
   "customManagers": [
     {
       "customType": "regex",
