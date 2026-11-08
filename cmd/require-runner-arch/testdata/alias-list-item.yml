@@ -1,0 +1,9 @@
+env:
+  OS: &os windows-2025
+jobs:
+  a:
+    runs-on:
+      - ubuntu-24.04-arm
+      - *os
+  b:
+    runs-on: [ubuntu-24.04-arm, *os]

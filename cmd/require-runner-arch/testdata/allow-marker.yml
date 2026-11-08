@@ -1,0 +1,13 @@
+jobs:
+  a:
+    runs-on: ubuntu-24.04 # require-runner-arch: allow
+  b:
+    runs-on:
+      - ubuntu-24.04-arm
+      - windows-2025 # require-runner-arch: allow
+  c:
+    runs-on: [ubuntu-24.04-arm, windows-2025] # require-runner-arch: allow
+  d:
+    runs-on: # require-runner-arch: allow
+      group: big
+      labels: ubuntu-24.04

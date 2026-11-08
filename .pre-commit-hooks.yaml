@@ -10,3 +10,9 @@
   entry: require-timeouts
   language: golang
   files: ^\.github/workflows/.*\.ya?ml$
+- id: require-runner-arch
+  name: require a runner architecture
+  description: Fail on GitHub Actions jobs that run on the wrong CPU architecture. Pass --arch=arm64 or --arch=x64.
+  entry: require-runner-arch
+  language: golang
+  files: ^\.github/workflows/.*\.ya?ml$
