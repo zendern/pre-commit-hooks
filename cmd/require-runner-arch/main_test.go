@@ -112,6 +112,25 @@ func TestRunCustomLabelMatch(t *testing.T) {
 	}
 }
 
+func TestRunUnknownArchWarns(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join("testdata", "expression.yml")
+
+	code := run([]string{"--arch=arm64", path}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("code %d, want 0", code)
+	}
+	want := path + `:3: warning: job "a" runs on "${{ matrix.os }}", architecture unknown` + "\n" +
+		path + `:5: warning: job "b" runs on "ubuntu-${{ matrix.version }}", architecture unknown` + "\n"
+	if stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout.String(), want)
+	}
+	if stderr.String() != "" {
+		t.Errorf("stderr %q, want none", stderr.String())
+	}
+}
+
 func TestRunBadFlags(t *testing.T) {
 	tests := []struct {
 		name string
@@ -162,7 +181,10 @@ func TestCheck(t *testing.T) {
 		}},
 		{"arm.yml", arm64, nil, nil},
 		{"x64-outside-runs-on.yml", arm64, nil, nil},
-		{"expression.yml", arm64, nil, nil},
+		{"expression.yml", arm64, nil, []string{
+			"warn a ${{ matrix.os }} 3",
+			"warn b ubuntu-${{ matrix.version }} 5",
+		}},
 		{"allow-marker.yml", arm64, nil, nil},
 		{"reusable-workflow-call.yml", arm64, nil, nil},
 		{"empty.yml", arm64, nil, nil},
@@ -174,21 +196,40 @@ func TestCheck(t *testing.T) {
 			"c macos-15 7",
 			"d macos-latest 9",
 			"e macos-15-xlarge 11",
-			"h macos-13-xlarge 17",
+			"h macos-13-xlarge 13",
 		}},
-		// Self-hosted jobs are skipped when there's no way to judge their labels.
+		// Self-hosted jobs only warn when there's no way to judge their labels.
 		// An exact label only: a lookalike doesn't count.
-		{"self-hosted.yml", arm64, nil, []string{"d ubuntu-24.04 11"}},
-		// Without --custom-label-matcher, custom labels pass.
-		{"custom-labels.yml", arm64, nil, []string{"f ubuntu-24.04 13"}},
+		{"self-hosted.yml", arm64, nil, []string{
+			"warn a self-hosted, ubuntu-24.04 3",
+			"warn b self-hosted 5",
+			"warn c ubuntu-24.04, self-hosted 8",
+			"d ubuntu-24.04 11",
+		}},
+		// Without --custom-label-matcher, custom labels only warn.
+		{"custom-labels.yml", arm64, nil, []string{
+			"warn a arc-arm-small 3",
+			"warn b arc-x64-small 5",
+			"warn c self-hosted, linux, arc-arm-big 7",
+			"warn d self-hosted, linux, x64 9",
+			"f ubuntu-24.04 13",
+			"warn h ${{ matrix.os }} 17",
+			"warn i self-hosted, ubuntu-24.04, arc-arm-big 19",
+			"warn j self-hosted, ubuntu-24.04 21",
+			"warn m arc-x64-big 31",
+			"warn o self-hosted, ${{ matrix.os }} 35",
+		}},
 		// With it, a match passes the whole job, and a job with only custom
-		// labels and no match is reported once, with every label.
+		// labels and no match is reported once, with every label. An expression
+		// might resolve to a match, so it still only warns.
 		{"custom-labels.yml", arm64, arc, []string{
 			"b arc-x64-small 5",
 			"d self-hosted, linux, x64 9",
 			"f ubuntu-24.04 13",
+			"warn h ${{ matrix.os }} 17",
 			"j ubuntu-24.04 21",
 			"m arc-x64-big 31",
+			"warn o self-hosted, ${{ matrix.os }} 35",
 		}},
 		{"custom-labels.yml", x64, arcX64, []string{
 			"a arc-arm-small 3",
@@ -196,6 +237,8 @@ func TestCheck(t *testing.T) {
 			"d self-hosted, linux, x64 9",
 			"e ubuntu-24.04-arm 11",
 			"g macos-15 15",
+			"warn h ${{ matrix.os }} 17",
+			"warn o self-hosted, ${{ matrix.os }} 35",
 		}},
 		// Aliases are followed and reported where they are used: the alias's
 		// line, or the job's key for a job reused whole.
@@ -215,7 +258,11 @@ func TestCheck(t *testing.T) {
 			}
 			var got []string
 			for _, f := range findings {
-				got = append(got, fmt.Sprint(f.job, " ", f.label, " ", f.line))
+				g := fmt.Sprint(f.job, " ", f.label, " ", f.line)
+				if f.warn {
+					g = "warn " + g
+				}
+				got = append(got, g)
 			}
 			if strings.Join(got, "|") != strings.Join(tt.want, "|") {
 				t.Errorf("got %q, want %q", got, tt.want)

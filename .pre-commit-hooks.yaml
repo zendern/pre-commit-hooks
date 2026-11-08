@@ -3,16 +3,19 @@
   description: Pin GitHub Actions runner labels to a version (e.g. ubuntu-24.04) instead of *-latest.
   entry: no-latest-runners
   language: golang
+  verbose: true # a passing hook's warnings are hidden otherwise
   files: ^\.github/workflows/.*\.ya?ml$
 - id: require-timeouts
   name: require timeout-minutes on jobs
   description: Require timeout-minutes on GitHub Actions jobs (and, with --steps, on steps) so a hung run doesn't hold a runner for GitHub's 6-hour default.
   entry: require-timeouts
   language: golang
+  verbose: true # a passing hook's warnings are hidden otherwise
   files: ^\.github/workflows/.*\.ya?ml$
 - id: require-runner-arch
   name: require a runner architecture
   description: Fail on GitHub Actions jobs that run on the wrong CPU architecture. Pass --arch=arm64 or --arch=x64.
   entry: require-runner-arch
   language: golang
+  verbose: true # a passing hook's warnings are hidden otherwise
   files: ^\.github/workflows/.*\.ya?ml$

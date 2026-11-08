@@ -1,0 +1,7 @@
+jobs:
+  a:
+    runs-on: ${{ matrix.os }} # no-latest-runners: allow
+  b:
+    runs-on:
+      - self-hosted
+      - ${{ matrix.os }} # no-latest-runners: allow

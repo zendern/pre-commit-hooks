@@ -33,16 +33,18 @@ type policy struct {
 }
 
 // finding is one label on the wrong architecture, or a job's whole label list
-// when none of its labels says what it runs on.
+// when none of its labels says what it runs on. With warn set it doesn't fail the
+// hook, because the job might still be on the required architecture.
 type finding struct {
 	line  int
 	job   string
 	label string
+	warn  bool
 }
 
 // run checks each workflow file in args and returns the exit code: 0 when every
-// job is on the required architecture, 1 when one is not or a file can't be
-// read, 2 for a bad flag.
+// job is on the required architecture or can't be judged, 1 when one is not or
+// a file can't be read, 2 for a bad flag.
 func run(args []string, stdout, stderr io.Writer) int {
 	var p policy
 	flags := flag.NewFlagSet("require-runner-arch", flag.ContinueOnError)
@@ -75,6 +77,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 			continue
 		}
 		for _, f := range findings {
+			if f.warn {
+				_, _ = fmt.Fprintf(stdout, "%s:%d: warning: job %q runs on %q, architecture unknown\n", path, f.line, f.job, f.label)
+				continue
+			}
 			_, _ = fmt.Fprintf(stdout, "%s:%d: job %q runs on %q\n", path, f.line, f.job, f.label)
 			failed = true
 		}
@@ -134,11 +140,17 @@ func check(r io.Reader, p policy) ([]finding, error) {
 // judge returns what is wrong with one job's labels. A custom match settles the
 // job whatever else it lists, since a custom runner can carry any label.
 func judge(job string, ls []label, p policy) []finding {
-	if p.custom == nil && slices.ContainsFunc(ls, isSelfHosted) {
+	if len(ls) == 0 {
 		return nil
 	}
 	if p.custom != nil && slices.ContainsFunc(ls, func(l label) bool { return p.custom.MatchString(l.node.Value) }) {
 		return nil
+	}
+	if p.custom == nil && slices.ContainsFunc(ls, isSelfHosted) {
+		if slices.ContainsFunc(ls, labelAllowed) {
+			return nil
+		}
+		return []finding{wholeJob(job, ls, true)}
 	}
 
 	var findings []finding
@@ -148,15 +160,22 @@ func judge(job string, ls []label, p policy) []finding {
 			findings = append(findings, finding{line: l.at.Line, job: job, label: l.node.Value})
 		}
 	}
-	if p.custom == nil || len(ls) == 0 || slices.ContainsFunc(ls, isSettled) {
+	if slices.ContainsFunc(ls, isSettled) {
 		return findings
 	}
-	// Only custom labels and no match: report the job once, not label by label.
+	// Nothing says what the job runs on. That only fails when the matcher could
+	// have said so: an expression might still resolve to a match.
+	warn := p.custom == nil || slices.ContainsFunc(ls, func(l label) bool { return isExpression(l.node.Value) })
+	return []finding{wholeJob(job, ls, warn)}
+}
+
+// wholeJob reports a job once, with every label, rather than label by label.
+func wholeJob(job string, ls []label, warn bool) finding {
 	values := make([]string, 0, len(ls))
 	for _, l := range ls {
 		values = append(values, l.node.Value)
 	}
-	return []finding{{line: ls[0].at.Line, job: job, label: strings.Join(values, ", ")}}
+	return finding{line: ls[0].at.Line, job: job, label: strings.Join(values, ", "), warn: warn}
 }
 
 // label is one runner label, after aliases are followed, and the node a finding
@@ -203,11 +222,10 @@ func isSelfHosted(l label) bool {
 	return l.node.Value == "self-hosted"
 }
 
-// isSettled reports whether a label needs no custom match: its architecture is
-// known, it can't be resolved, or the job is exempt through it.
+// isSettled reports whether a label says all the hook needs about its job: its
+// architecture is known, or the job is exempt through it.
 func isSettled(l label) bool {
-	v := l.node.Value
-	return archOf(v) != "" || isExpression(v) || labelAllowed(l)
+	return archOf(l.node.Value) != "" || labelAllowed(l)
 }
 
 func isExpression(v string) bool {

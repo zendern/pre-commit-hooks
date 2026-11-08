@@ -47,6 +47,42 @@ func TestRunFloating(t *testing.T) {
 	}
 }
 
+func TestRunExpressionWarns(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join("testdata", "expression.yml")
+
+	code := run([]string{path}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("code %d, want 0", code)
+	}
+	if want := path + `:3: warning: job "a" runs on "${{ matrix.os }}", an expression this hook can't check` + "\n"; stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout.String(), want)
+	}
+	if stderr.String() != "" {
+		t.Errorf("stderr %q, want none", stderr.String())
+	}
+}
+
+func TestRunExpressionAndFloating(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join("testdata", "expression-and-floating.yml")
+
+	code := run([]string{path}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("code %d, want 1", code)
+	}
+	want := path + `:3: warning: job "a" runs on "${{ matrix.os }}", an expression this hook can't check` + "\n" +
+		path + `:5: job "b" runs on "ubuntu-latest"` + "\n"
+	if stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout.String(), want)
+	}
+	if stderr.String() != hint {
+		t.Errorf("stderr %q, want %q", stderr.String(), hint)
+	}
+}
+
 func TestRunMissingFileStillChecksTheRest(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	missing := filepath.Join("testdata", "missing.yml")
@@ -86,7 +122,9 @@ func TestCheck(t *testing.T) {
 		{"several-jobs.yml", []string{"a ubuntu-latest 3", "c macos-latest 7"}},
 		{"pinned.yml", nil},
 		{"latest-outside-runs-on.yml", nil},
-		{"expression.yml", nil},
+		{"expression.yml", []string{"warn a ${{ matrix.os }} 3"}},
+		{"expression-allow.yml", nil},
+		{"expression-and-floating.yml", []string{"warn a ${{ matrix.os }} 3", "b ubuntu-latest 5"}},
 		{"allow-marker.yml", nil},
 		{"reusable-workflow-call.yml", nil},
 		{"empty.yml", nil},
@@ -108,7 +146,11 @@ func TestCheck(t *testing.T) {
 			}
 			var got []string
 			for _, f := range findings {
-				got = append(got, fmt.Sprint(f.job, " ", f.label, " ", f.line))
+				g := fmt.Sprint(f.job, " ", f.label, " ", f.line)
+				if f.warn {
+					g = "warn " + g
+				}
+				got = append(got, g)
 			}
 			if strings.Join(got, "|") != strings.Join(tt.want, "|") {
 				t.Errorf("got %q, want %q", got, tt.want)

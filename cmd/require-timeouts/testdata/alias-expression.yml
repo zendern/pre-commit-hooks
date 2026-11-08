@@ -1,0 +1,5 @@
+env:
+  T: &t ${{ inputs.timeout }}
+jobs:
+  a:
+    timeout-minutes: *t
