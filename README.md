@@ -19,6 +19,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
     - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
+    - [`actions-lock` and `actions-lock-verify`](#actions-lock-and-actions-lock-verify): check the workflow lockfile
 - [Development](#development)
   - [Releases](#releases)
 
@@ -35,6 +36,8 @@ repos:
       - id: require-timeouts
       - id: require-runner-arch
         args: [--arch=arm64]
+      - id: actions-lock
+      - id: actions-lock-verify # manual stage: run in CI with GH_TOKEN
 ```
 
 > [!NOTE]
@@ -259,6 +262,38 @@ Some jobs have to stay on another architecture, such as one that builds
   ```
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
+
+#### `actions-lock` and `actions-lock-verify`
+
+Check the [workflow lockfile](https://github.com/github/gh-actions-lock)
+`.github/workflows/actions.lock`, which pins every action a workflow uses,
+including the actions those actions call, to a commit. Both run
+[`gh-actions-lock`](https://github.com/github/gh-actions-lock), built from its
+Go module at the version pinned in `.pre-commit-hooks.yaml`, so neither needs
+`gh` or the `gh actions-lock` extension installed.
+
+- `actions-lock` runs `gh-actions-lock --verify-local` on commit: an offline
+  check that every action has a lockfile entry. It runs when a workflow, the
+  lockfile, or an `action.yml` changes. It doesn't check that the entries are
+  genuine.
+- `actions-lock-verify` runs `gh-actions-lock --verify`: it resolves every
+  entry against GitHub, as the runner does, and fails on a moved tag, a
+  changed owner or an unused entry. It needs `GH_TOKEN` and the network, so it
+  is in the `manual` stage and never runs on commit. Run it in CI:
+
+  ```sh
+  prek run --hook-stage manual actions-lock-verify --all-files
+  ```
+
+  Naming the hook id makes that command fail when a repo hasn't configured the
+  hook, so CI can't skip the check silently.
+
+Both fail when the lockfile is out of date. Regenerate it after editing a
+`uses:` line:
+
+```sh
+gh actions-lock
+```
 
 ## Development
 
