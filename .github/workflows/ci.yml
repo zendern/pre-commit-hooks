@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     # A cold ./bin cache builds every Go tool from source; warm runs take a
     # couple of minutes.
     timeout-minutes: 15
@@ -60,7 +60,7 @@ jobs:
   workflow-summary:
     if: ${{ always() }}
     needs: [checks]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions: {}
     steps:
@@ -75,7 +75,7 @@ jobs:
   release:
     if: ${{ github.event_name == 'push' }}
     needs: [checks]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: write # create the release and its tag
