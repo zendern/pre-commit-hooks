@@ -285,8 +285,10 @@ gh actions-lock
 Fails when an action used in `.github/workflows/` has no entry in the
 lockfile. It runs `gh-actions-lock --verify-local`: offline, with no token.
 
-It runs when a workflow, the lockfile, or an `action.yml` changes (in-repo
-actions reached through `$/` are locked too). It only checks that every action
+It runs on every commit, whatever changed: it checks the whole repository in
+milliseconds, and a file filter would miss a commit that only deletes an
+`action.yml` a workflow reaches through `$/` (those in-repo actions are locked
+too). It only checks that every action
 has an entry, not that the entries are genuine; [`gh-actions-lock-verify`](#gh-actions-lock-verify)
 does that.
 

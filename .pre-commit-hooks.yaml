@@ -30,8 +30,9 @@
   additional_dependencies:
     # renovate: datasource=go depName=github.com/github/gh-actions-lock
     - github.com/github/gh-actions-lock/cmd/gh-actions-lock@v0.4.1
-  # Workflows, the lockfile, and in-repo actions reached through `$/`.
-  files: (^\.github/workflows/|(^|/)action\.ya?ml$)
+  # On every commit: it checks the whole repo in milliseconds, and a file filter
+  # would skip a commit that only deletes an action a workflow reaches via `$/`.
+  always_run: true
   pass_filenames: false
 - id: gh-actions-lock-verify
   name: workflow lockfile provenance
