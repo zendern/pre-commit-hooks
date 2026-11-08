@@ -321,6 +321,23 @@ Failure output
   ↳ .github/workflows/ruleset-drift.yml
 ```
 
+##### Choosing when they run
+
+The two hooks are separate so each is safe to list with no extra config:
+`actions-lock` on commit, `actions-lock-verify` only when asked. Both are
+read-only. (`gh-actions-lock` with no flag rewrites workflows and the lockfile,
+so neither hook runs it that way.)
+
+To run either one at another point, override `stages`. For example, to check
+provenance before every push, with `GH_TOKEN` set in your shell:
+
+```yaml
+    hooks:
+      - id: actions-lock
+      - id: actions-lock-verify
+        stages: [pre-push]
+```
+
 ##### gh-actions-lock version
 
 Both hooks build [`gh-actions-lock`](https://github.com/github/gh-actions-lock)
@@ -330,16 +347,17 @@ rejects a tag that moved after it was first published.
 
 To run a different version, for example to try a new release early, override
 `additional_dependencies` on both hooks, so the commit and CI checks agree. The
-list replaces the hook's own:
+list replaces the hook's own. Pin the release's commit SHA with its tag in a
+comment; Go resolves a tagged commit to that version:
 
 ```yaml
     hooks:
       - id: actions-lock
         additional_dependencies:
-          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@v0.5.0
+          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@759f9c2d44e8599fa5b29224e5a30c58b3555211 # v0.4.0
       - id: actions-lock-verify
         additional_dependencies:
-          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@v0.5.0
+          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@759f9c2d44e8599fa5b29224e5a30c58b3555211 # v0.4.0
 ```
 
 Renovate doesn't bump an override, and a repo that keeps one drifts from the
