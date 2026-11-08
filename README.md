@@ -19,7 +19,8 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
     - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
-    - [`actions-lock` and `actions-lock-verify`](#actions-lock-and-actions-lock-verify): check the workflow lockfile
+    - [`actions-lock`](#actions-lock): every action has a workflow lockfile entry (offline, on commit)
+    - [`actions-lock-verify`](#actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
 - [Development](#development)
   - [Releases](#releases)
 
@@ -263,37 +264,87 @@ Some jobs have to stay on another architecture, such as one that builds
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
-#### `actions-lock` and `actions-lock-verify`
+#### `actions-lock`
 
-Check the [workflow lockfile](https://github.com/github/gh-actions-lock)
+Fails when an action used in `.github/workflows/` has no entry in the
+[workflow lockfile](https://github.com/github/gh-actions-lock)
 `.github/workflows/actions.lock`, which pins every action a workflow uses,
-including the actions those actions call, to a commit. Both run
-[`gh-actions-lock`](https://github.com/github/gh-actions-lock), built from its
-Go module at the version pinned in `.pre-commit-hooks.yaml`, so neither needs
-`gh` or the `gh actions-lock` extension installed.
+including the actions those actions call, to a commit. It runs
+`gh-actions-lock --verify-local`: offline, with no token.
 
-- `actions-lock` runs `gh-actions-lock --verify-local` on commit: an offline
-  check that every action has a lockfile entry. It runs when a workflow, the
-  lockfile, or an `action.yml` changes. It doesn't check that the entries are
-  genuine.
-- `actions-lock-verify` runs `gh-actions-lock --verify`: it resolves every
-  entry against GitHub, as the runner does, and fails on a moved tag, a
-  changed owner or an unused entry. It needs `GH_TOKEN` and the network, so it
-  is in the `manual` stage and never runs on commit. Run it in CI:
+It runs when a workflow, the lockfile, or an `action.yml` changes (in-repo
+actions reached through `$/` are locked too). It only checks that every action
+has an entry, not that the entries are genuine; [`actions-lock-verify`](#actions-lock-verify)
+does that.
 
-  ```sh
-  prek run --hook-stage manual actions-lock-verify --all-files
-  ```
-
-  Naming the hook id makes that command fail when a repo hasn't configured the
-  hook, so CI can't skip the check silently.
-
-Both fail when the lockfile is out of date. Regenerate it after editing a
-`uses:` line:
+Regenerate the lockfile after editing a `uses:` line:
 
 ```sh
 gh actions-lock
 ```
+
+Failure output
+
+```
+1 of 2 workflows failed: 1 not-pinned
+Run without --verify-local to resolve and pin missing actions.
+```
+
+#### `actions-lock-verify`
+
+Fails when an entry in `.github/workflows/actions.lock` doesn't match GitHub:
+a tag that moved, a locked commit no longer in the action's history, a changed
+owner, or an unused entry. It runs `gh-actions-lock --verify`, which resolves
+every entry as the runner does at job start.
+
+It needs `GH_TOKEN` and the network, so it is in the `manual` stage and never
+runs on commit. Run it in CI:
+
+```yaml
+      - name: Verify the workflow lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: prek run --hook-stage manual actions-lock-verify --all-files
+```
+
+Naming the hook id makes that command fail when a repo hasn't configured the
+hook, so CI can't skip the check silently. Locally:
+`GH_TOKEN=$(gh auth token) prek run --hook-stage manual actions-lock-verify --all-files`.
+
+Failure output
+
+```
+1 of 2 workflows failed
+✗ Pinned commit not in upstream history actions/create-github-app-token@v3.3.0
+  locked commit 64ab729a6294 is not in actions/create-github-app-token's history: it was force-pushed away, or the lockfile was edited; v3.3.0 currently points at 64ab729a6294
+  ! verify it, then run `gh actions-lock --accept-moved`
+  ↳ .github/workflows/ruleset-drift.yml
+```
+
+##### gh-actions-lock version
+
+Both hooks build [`gh-actions-lock`](https://github.com/github/gh-actions-lock)
+from its Go module at the version in `.pre-commit-hooks.yaml`, so neither needs
+`gh` or the `gh actions-lock` extension installed. The Go checksum database
+rejects a tag that moved after it was first published.
+
+To run a different version, for example to try a new release early, override
+`additional_dependencies` on both hooks, so the commit and CI checks agree. The
+list replaces the hook's own:
+
+```yaml
+    hooks:
+      - id: actions-lock
+        additional_dependencies:
+          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@v0.5.0
+      - id: actions-lock-verify
+        additional_dependencies:
+          - github.com/github/gh-actions-lock/cmd/gh-actions-lock@v0.5.0
+```
+
+Renovate doesn't bump an override, and a repo that keeps one drifts from the
+version every other repo runs, so remove it once this repository's pin catches
+up.
 
 ## Development
 
