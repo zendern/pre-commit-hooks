@@ -49,7 +49,7 @@ jobs:
       # the manifest check, tests with the coverage gate, go mod tidy,
       # govulncheck, and go-licenses. The token turns on zizmor's online audits.
       - name: Run prek hooks
-        uses: j178/prek-action@v3.0.2
+        uses: j178/prek-action@v3.1.0
         env:
           GH_TOKEN: ${{ github.token }}
         with:
