@@ -120,6 +120,8 @@ func TestCheck(t *testing.T) {
 		{"block-list.yml", []string{"a ubuntu-latest 5"}},
 		{"group-labels.yml", []string{"a ubuntu-latest 5"}},
 		{"several-jobs.yml", []string{"a ubuntu-latest 3", "c macos-latest 7"}},
+		// GitHub's labels are case-insensitive.
+		{"label-case.yml", []string{"a Ubuntu-Latest 3", "b macos-LATEST 5"}},
 		{"pinned.yml", nil},
 		{"latest-outside-runs-on.yml", nil},
 		{"expression.yml", []string{"warn a ${{ matrix.os }} 3"}},

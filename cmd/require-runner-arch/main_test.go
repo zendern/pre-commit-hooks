@@ -131,6 +131,26 @@ func TestRunUnknownArchWarns(t *testing.T) {
 	}
 }
 
+func TestRunCustomLabelMatcherIgnoresCase(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	path := filepath.Join("testdata", "label-case.yml")
+
+	code := run([]string{"--arch=arm64", "--custom-label-matcher", "^arc-arm-", path}, &stdout, &stderr)
+
+	if code != 1 {
+		t.Fatalf("code %d, want 1", code)
+	}
+	want := path + `:3: job "a" runs on "Ubuntu-24.04"` + "\n" +
+		path + `:7: job "c" runs on "MACOS-13"` + "\n" +
+		path + `:9: job "d" runs on "Self-Hosted, Linux"` + "\n"
+	if stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout.String(), want)
+	}
+	if stderr.String() != armHint+customHint {
+		t.Errorf("stderr %q, want %q", stderr.String(), armHint+customHint)
+	}
+}
+
 func TestRunBadFlags(t *testing.T) {
 	tests := []struct {
 		name string
@@ -239,6 +259,19 @@ func TestCheck(t *testing.T) {
 			"g macos-15 15",
 			"warn h ${{ matrix.os }} 17",
 			"warn o self-hosted, ${{ matrix.os }} 35",
+		}},
+		// GitHub's labels are case-insensitive.
+		{"label-case.yml", arm64, nil, []string{
+			"a Ubuntu-24.04 3",
+			"c MACOS-13 7",
+			"warn d Self-Hosted, Linux 9",
+			"warn f ARC-ARM-small 13",
+		}},
+		{"label-case.yml", x64, nil, []string{
+			"b Ubuntu-24.04-ARM 5",
+			"warn d Self-Hosted, Linux 9",
+			"e macOS-15 11",
+			"warn f ARC-ARM-small 13",
 		}},
 		// Aliases are followed and reported where they are used: the alias's
 		// line, or the job's key for a job reused whole.
