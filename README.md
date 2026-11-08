@@ -19,8 +19,9 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [`no-latest-runners`](#no-latest-runners): pin runner labels instead of `*-latest`
     - [`require-timeouts`](#require-timeouts): require `timeout-minutes` on jobs (and steps)
     - [`require-runner-arch`](#require-runner-arch): require one CPU architecture for runners
-    - [`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local): every action has a workflow lockfile entry (offline, on commit)
-    - [`gh-actions-lock-verify`](#gh-actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
+    - [Workflow lockfile (`gh-actions-lock`)](#workflow-lockfile-gh-actions-lock): hooks that run GitHub's `gh-actions-lock` CLI
+      - [`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local): every action has a lockfile entry (offline, on commit)
+      - [`gh-actions-lock-verify`](#gh-actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
 - [Development](#development)
   - [Releases](#releases)
 
@@ -264,24 +265,30 @@ Some jobs have to stay on another architecture, such as one that builds
 
 - Whole files: add `exclude:` to the hook in your `.pre-commit-config.yaml`.
 
-#### `gh-actions-lock-verify-local`
+#### Workflow lockfile (`gh-actions-lock`)
+
+These hooks wrap GitHub's [`gh-actions-lock`](https://github.com/github/gh-actions-lock)
+CLI, the tool behind the `gh actions-lock` extension, rather than parsing
+workflows themselves, so the YAML-anchor and [warnings](#warnings) notes above
+don't apply to them. They check the workflow lockfile
+`.github/workflows/actions.lock`, which pins every action a workflow uses,
+including the actions those actions call, to a commit.
+
+Both only read. Regenerate the lockfile yourself after editing a `uses:` line:
+
+```sh
+gh actions-lock
+```
+
+##### `gh-actions-lock-verify-local`
 
 Fails when an action used in `.github/workflows/` has no entry in the
-[workflow lockfile](https://github.com/github/gh-actions-lock)
-`.github/workflows/actions.lock`, which pins every action a workflow uses,
-including the actions those actions call, to a commit. It runs
-`gh-actions-lock --verify-local`: offline, with no token.
+lockfile. It runs `gh-actions-lock --verify-local`: offline, with no token.
 
 It runs when a workflow, the lockfile, or an `action.yml` changes (in-repo
 actions reached through `$/` are locked too). It only checks that every action
 has an entry, not that the entries are genuine; [`gh-actions-lock-verify`](#gh-actions-lock-verify)
 does that.
-
-Regenerate the lockfile after editing a `uses:` line:
-
-```sh
-gh actions-lock
-```
 
 Failure output
 
@@ -290,7 +297,7 @@ Failure output
 Run without --verify-local to resolve and pin missing actions.
 ```
 
-#### `gh-actions-lock-verify`
+##### `gh-actions-lock-verify`
 
 Fails when an entry in `.github/workflows/actions.lock` doesn't match GitHub:
 a tag that moved, a locked commit no longer in the action's history, a changed
@@ -324,9 +331,9 @@ Failure output
 ##### Choosing when they run
 
 The two hooks are separate so each is safe to list with no extra config:
-`gh-actions-lock-verify-local` on commit, `gh-actions-lock-verify` only when asked. Both are
-read-only. (`gh-actions-lock` with no flag rewrites workflows and the lockfile,
-so neither hook runs it that way.)
+`gh-actions-lock-verify-local` on commit, `gh-actions-lock-verify` only when
+asked. Neither runs `gh-actions-lock` without a flag, which rewrites workflows
+and the lockfile.
 
 To run either one at another point, override `stages`. For example, to check
 provenance before every push, with `GH_TOKEN` set in your shell:
@@ -340,8 +347,7 @@ provenance before every push, with `GH_TOKEN` set in your shell:
 
 ##### gh-actions-lock version
 
-Both hooks build [`gh-actions-lock`](https://github.com/github/gh-actions-lock)
-from its Go module at the version in `.pre-commit-hooks.yaml`, so neither needs
+Both hooks build `gh-actions-lock` from its Go module at the version in `.pre-commit-hooks.yaml`, so neither needs
 `gh` or the `gh actions-lock` extension installed. The Go checksum database
 rejects a tag that moved after it was first published.
 
