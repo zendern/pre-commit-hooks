@@ -67,7 +67,7 @@ repos:
         files: ^\.github/workflows/.*\.ya?ml$
       - id: require-runner-arch
         name: require-runner-arch (this checkout)
-        entry: go run ./cmd/require-runner-arch --arch=x64
+        entry: go run ./cmd/require-runner-arch --arch=arm64
         language: system
         files: ^\.github/workflows/.*\.ya?ml$
       # The manifest is what every consuming repo installs from, so a bad

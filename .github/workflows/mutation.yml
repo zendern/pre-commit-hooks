@@ -24,7 +24,7 @@ jobs:
   mutation:
     name: mutation testing
     if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     # A whole-module run takes well under a minute today; this leaves room to
     # grow before a hung mutant is the more likely cause.
     timeout-minutes: 20

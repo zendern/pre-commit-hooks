@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   checks:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     # A cold ./bin cache builds every Go tool from source; warm runs take a
     # couple of minutes.
     timeout-minutes: 15
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: bin
-          key: tools-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.mod', 'Taskfile.yml') }}
+          key: tools-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.mod', 'Taskfile.yml') }}
       # Same prek as `task setup` installs locally.
       - name: Read the prek version pinned in Taskfile.yml
         id: prek
@@ -60,7 +60,7 @@ jobs:
   workflow-summary:
     if: ${{ always() }}
     needs: [checks]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions: {}
     steps:
@@ -75,7 +75,7 @@ jobs:
   release:
     if: ${{ github.event_name == 'push' }}
     needs: [checks]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 5
     permissions:
       contents: write # create the release and its tag

@@ -1,7 +1,7 @@
 # pre-commit-hooks
 
 [![ci](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/zendern/pre-commit-hooks/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go_1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go_1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?logo=precommit&logoColor=white)](https://pre-commit.com) [![prek](https://img.shields.io/badge/prek-enabled-DE611A?logo=precommit&logoColor=white)](https://github.com/j178/prek) [![Task](https://img.shields.io/badge/Task-29BEB0?logo=task&logoColor=white)](https://taskfile.dev) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 
 Shared [pre-commit](https://pre-commit.com) hooks.
