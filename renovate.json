@@ -2,5 +2,15 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Go tools a hook installs through additional_dependencies, marked with a `# renovate:` comment naming the module (the entry is a package path below it, `<module>/cmd/<tool>@<version>`).",
+      "managerFilePatterns": ["/^\\.pre-commit-hooks\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*- \\S+@(?<currentValue>v\\S+)"
+      ]
+    }
   ]
 }
