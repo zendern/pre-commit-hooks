@@ -255,3 +255,12 @@ func TestReason(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsignedRejectsMalformedGitOutput(t *testing.T) {
+	gitExec = func(...string) (string, error) { return "no separators here", nil }
+	t.Cleanup(func() { gitExec = git })
+
+	if _, err := Unsigned("HEAD", false); err == nil {
+		t.Fatal("Unsigned accepted a git log line without fields, want an error")
+	}
+}

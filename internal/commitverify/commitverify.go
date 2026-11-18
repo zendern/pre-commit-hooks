@@ -71,11 +71,15 @@ func Unsigned(rev string, strict bool) ([]Commit, error) {
 		return nil, err
 	}
 
+	if out == "" {
+		return nil, nil // nothing to push
+	}
+
 	var unsigned []Commit
 	for _, line := range strings.Split(out, "\n") {
 		fields := strings.SplitN(line, "\x00", 3)
 		if len(fields) < 3 {
-			continue // no commits: git printed nothing
+			return nil, fmt.Errorf("unexpected git log line %q", line)
 		}
 		hash, status := fields[0], Status(fields[1])
 		if status == None {
