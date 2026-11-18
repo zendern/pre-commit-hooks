@@ -35,7 +35,7 @@ jobs:
       # Restoring ./bin lets Task's status check in go-install see the right
       # module version and Go toolchain and skip the build. A bumped pin in
       # Taskfile.yml, go.mod or the Go version changes the key and rebuilds.
-      - uses: actions/cache@v5.1.0
+      - uses: actions/cache@v6.1.0
         with:
           path: bin
           key: tools-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.mod', 'Taskfile.yml') }}
