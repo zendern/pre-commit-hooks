@@ -45,21 +45,11 @@
   stages: [manual]
   always_run: true
   pass_filenames: false
-# Commit verification, as two hooks: verify-commits-record runs on commit-msg,
-# after the pre-commit hooks passed, and records that in a trailer;
-# verify-commits runs on pre-push and blocks a push that sends a commit with no
-# trailer for its tree, as a commit made with --no-verify has. The README has
-# the setup.
-- id: verify-commits-record
-  name: record commit verification
-  description: On commit-msg, after the pre-commit hooks passed, add a Verified-tree trailer naming the commit's tree. Needs the commit-msg hook type installed; verify-commits checks the trailer at push.
-  entry: verify-commits-record
-  language: golang
-  stages: [commit-msg]
-  always_run: true
+# Pre-push signature gate: committing unsigned stays possible, pushing it
+# doesn't. Only commits no remote-tracking ref has are checked.
 - id: verify-commits
-  name: commits verified before push
-  description: Fail a push that sends a commit without a Verified-tree trailer for its tree, i.e. one committed with --no-verify. Pair with verify-commits-record.
+  name: commits signed before push
+  description: Fail a push that sends an unsigned commit, or one with a bad signature. Signatures git can't check locally (no allowed-signers file or key) count as signed.
   entry: verify-commits
   language: golang
   stages: [pre-push]

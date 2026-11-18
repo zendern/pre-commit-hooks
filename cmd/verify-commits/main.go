@@ -1,10 +1,10 @@
-// Command verify-commits is a pre-push hook: it fails a push that sends a commit
-// which didn't pass the commit-time hooks, because it was made with --no-verify.
-// Commits pass when verify-commits-record recorded them on commit-msg.
+// Command verify-commits is a pre-push hook: it fails a push that sends an
+// unsigned commit, or one with a bad signature. Committing unsigned stays
+// possible; the push is what stops.
 //
 // Commits that are reachable from the pushed revision but not from any
 // remote-tracking ref are checked, so a commit already on the remote is never
-// asked for a record.
+// checked again.
 package main
 
 import (

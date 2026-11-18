@@ -22,9 +22,7 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [Workflow lockfile (`gh-actions-lock`)](#workflow-lockfile-gh-actions-lock): hooks that run GitHub's `gh-actions-lock` CLI
       - [`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local): every action has a lockfile entry (offline, on commit)
       - [`gh-actions-lock-verify`](#gh-actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
-- [Commit verification](#commit-verification): block a push that sends a commit made with `--no-verify`
-  - [`verify-commits-record`](#verify-commits-record): record that a commit passed the commit-time hooks (commit-msg)
-  - [`verify-commits`](#verify-commits): fail a push that sends an unrecorded commit (pre-push)
+- [`verify-commits`](#verify-commits): fail a push that sends an unsigned commit (pre-push)
 - [Development](#development)
   - [Releases](#releases)
 
@@ -375,80 +373,58 @@ Renovate doesn't bump an override, and a repo that keeps one drifts from the
 version every other repo runs, so remove it once this repository's pin catches
 up.
 
-### Commit verification
+### `verify-commits`
 
-Commits made with `git commit --no-verify` skip the commit-time hooks. These two
-hooks let that happen but stop the push: a commit gets a record when the
-commit-time hooks pass, and `verify-commits` fails any push that sends a commit
-without one. The record is a `Verified-tree` trailer in the commit message, naming
-the commit's tree, so no file is kept.
+Fails a push that sends an unsigned commit, or one with a bad signature. It runs
+on `pre-push`, so committing unsigned (`git -c commit.gpgsign=false commit`, a
+WIP commit) still works; only the push stops.
 
 ```yaml
-default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: https://github.com/zendern/pre-commit-hooks
-    rev: <full commit sha>  # frozen: vX.Y.Z, a release with these hooks
+    rev: <full commit sha>  # frozen: vX.Y.Z, a release with this hook
     hooks:
-      - id: verify-commits-record
       - id: verify-commits
 ```
 
-Keep your commit-time hooks in the `pre-commit` stage, as they are now. Run
-`prek install` (or `pre-commit install`) again after adding these, so git runs
-the `commit-msg` and `pre-push` hooks.
+Run `prek install` (or `pre-commit install`) again after adding it, so git runs
+the `pre-push` hook.
 
-- `git commit --no-verify`: the commit is made and not recorded.
-- `git push`: fails if any commit the push sends is unrecorded, and lists them:
+It checks the commits reachable from `PRE_COMMIT_TO_REF` (or `HEAD`) that no
+remote-tracking ref has, so commits already on a remote are never checked.
+GPG and SSH signatures both count. A signature git can't check locally, such as
+an SSH signature with no `gpg.ssh.allowedSignersFile`, counts as signed: this
+hook checks that commits are signed, not who signed them. A signature git checks
+and finds wrong (`%G?` is `B`) fails.
 
-  ```
-  Push blocked: these commits were not verified at commit time (committed with --no-verify, or amended or rebased since).
-    adbfecc90a2e feat: b
-  Commit them again with the hooks on: git commit --amend --no-edit, or for several: git rebase --exec 'git commit --amend --no-edit' <last pushed commit>
-  ```
+To accept only signatures git can check and finds good, pass `--strict`. It
+also fails a signature git can't check, an expired signature or key, and a
+revoked key. Each developer then needs the signers' keys trusted locally
+(`gpg.ssh.allowedSignersFile` for SSH, the keyring for GPG).
 
-- Fixing it: run the commit again with hooks on. For the last commit,
-  `git commit --amend --no-edit`. For several, the `git rebase --exec` line in
-  the message.
-- `git push --no-verify` skips `verify-commits`. It is the one deliberate way
-  past the gate. Nothing here checks pushes on the server; a CI job that runs
-  `verify-commits` would need its own setup.
-- `SKIP=<hook id> git commit` runs the commit with a hook skipped, so the commit
-  is not recorded: a skipped hook didn't verify it.
-- A rebase keeps the trailer but names the old tree, so a rebased commit whose
-  tree changed is unrecorded until it is committed again with hooks.
+```yaml
+    hooks:
+      - id: verify-commits
+        args: [--strict]
+```
+
+Failure output
+
+```
+Push blocked: these commits are not signed with a signature this hook accepts:
+  adbfecc90a2e feat: b (no signature)
+Sign them: git commit --amend --no-edit -S, or for several: git rebase --exec 'git commit --amend --no-edit -S' <last pushed commit>
+```
 
 Limits:
 
-- Commits made before these hooks were added have no record. The first push that
-  includes them fails. Push those with `git push --no-verify`, or commit them
-  again as above.
-- `verify-commits` checks the range from `PRE_COMMIT_TO_REF` to the commits no
-  remote-tracking ref has. pre-commit passes the hook one ref of a push, the
-  first one, so a push of several refs is checked for that ref only. prek is
-  expected to match; this is not tested against prek's multi-ref behavior.
-
-#### `verify-commits-record`
-
-On `commit-msg`. git runs that stage only after the `pre-commit` hooks pass, and
-`--no-verify` skips it, so only a commit that passed its checks gets the trailer:
-
-```
-feat: add a hook
-
-Verified-tree: 6f1c...
-```
-
-The value is the commit's tree hash. It doesn't record a commit while `SKIP` is set.
-
-#### `verify-commits`
-
-On `pre-push`. It checks the commits in `PRE_COMMIT_TO_REF` that no remote-tracking
-ref has, and passes when each one's trailer names its own tree. A commit already on
-a remote is never checked. It has `always_run: true`, so a push that changes no
-files is still checked.
-
-To run it at another stage, override `stages` on the hook, as with the lockfile
-hooks above.
+- Pushing with `--no-verify` skips it, and nothing checks on the server. Use a
+  GitHub ruleset that requires signed commits for that.
+- pre-commit passes the hook only the first ref of a multi-ref push, so only
+  that ref's commits are checked.
+- Commits made before you started signing fail the first push that includes
+  them.
 
 ## Development
 
