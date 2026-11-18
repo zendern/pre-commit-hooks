@@ -14,14 +14,14 @@ type Status string
 
 // The statuses git reports in %G?.
 const (
-	Good          Status = "G" // good signature
-	GoodUntrusted Status = "U" // good signature, key trust unknown
-	Bad           Status = "B" // bad signature
-	Unchecked     Status = "E" // signature git can't check
-	Expired       Status = "X" // good signature that has expired
-	ExpiredKey    Status = "Y" // good signature by an expired key
-	RevokedKey    Status = "R" // good signature by a revoked key
-	None          Status = "N" // no signature
+	Good       Status = "G" // good signature
+	Untrusted  Status = "U" // good signature by a key not trusted (GPG only)
+	Bad        Status = "B" // bad signature
+	Unchecked  Status = "E" // signature git can't check
+	Expired    Status = "X" // good signature that has expired
+	ExpiredKey Status = "Y" // good signature by an expired key
+	RevokedKey Status = "R" // good signature by a revoked key
+	None       Status = "N" // no signature
 )
 
 // Reason describes a status in a few words, for a failure message.
@@ -29,8 +29,8 @@ func (s Status) Reason() string {
 	switch s {
 	case Good:
 		return "good signature"
-	case GoodUntrusted:
-		return "good signature, key trust unknown"
+	case Untrusted:
+		return "key not trusted"
 	case Bad:
 		return "bad signature"
 	case Unchecked:
@@ -60,7 +60,7 @@ type Commit struct {
 // By default a commit fails with no signature (None) or a bad one (Bad). Any
 // other status passes, Unchecked included: the commit is signed, and failing it
 // would block everyone without a local trust setup. With strict set, only Good
-// and GoodUntrusted pass.
+// passes: Untrusted means the key is in the keyring, not that it is trusted.
 //
 // git reports an SSH signature as N when gpg.ssh.allowedSignersFile is unset,
 // the same as no signature, so a None commit whose raw object carries a
@@ -97,7 +97,7 @@ func Unsigned(rev string, strict bool) ([]Commit, error) {
 // fails reports whether the status fails the check.
 func (s Status) fails(strict bool) bool {
 	if strict {
-		return s != Good && s != GoodUntrusted
+		return s != Good
 	}
 	return s == None || s == Bad
 }

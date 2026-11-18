@@ -398,10 +398,12 @@ an SSH signature with no `gpg.ssh.allowedSignersFile`, counts as signed: this
 hook checks that commits are signed, not who signed them. A signature git checks
 and finds wrong (`%G?` is `B`) fails.
 
-To accept only signatures git can check and finds good, pass `--strict`. It
-also fails a signature git can't check, an expired signature or key, and a
-revoked key. Each developer then needs the signers' keys trusted locally
-(`gpg.ssh.allowedSignersFile` for SSH, the keyring for GPG).
+To accept only signatures git reports as good (`%G?` is `G`), pass `--strict`.
+It also fails a signature git can't check, a GPG key that is in the keyring but
+not trusted (`U`), an expired signature or key, and a revoked key. Each
+developer then needs the signers' keys trusted locally:
+`gpg.ssh.allowedSignersFile` for SSH, and for GPG ownertrust on each key (or
+`trust-model always` in `gpg.conf` to trust every key in the keyring).
 
 ```yaml
     hooks:

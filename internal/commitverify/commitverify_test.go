@@ -221,7 +221,7 @@ func TestFailsByStatus(t *testing.T) {
 		def, strict bool
 	}{
 		{Good, false, false},
-		{GoodUntrusted, false, false},
+		{Untrusted, false, true},
 		{None, true, true},
 		{Bad, true, true},
 		{Unchecked, false, true},
@@ -240,15 +240,15 @@ func TestFailsByStatus(t *testing.T) {
 
 func TestReason(t *testing.T) {
 	for status, want := range map[Status]string{
-		Good:          "good signature",
-		GoodUntrusted: "good signature, key trust unknown",
-		Bad:           "bad signature",
-		Unchecked:     "signature git can't check",
-		Expired:       "expired signature",
-		ExpiredKey:    "signature by an expired key",
-		RevokedKey:    "signature by a revoked key",
-		None:          "no signature",
-		"Z":           "signature status Z",
+		Good:       "good signature",
+		Untrusted:  "key not trusted",
+		Bad:        "bad signature",
+		Unchecked:  "signature git can't check",
+		Expired:    "expired signature",
+		ExpiredKey: "signature by an expired key",
+		RevokedKey: "signature by a revoked key",
+		None:       "no signature",
+		"Z":        "signature status Z",
 	} {
 		if got := status.Reason(); got != want {
 			t.Errorf("%q.Reason() = %q, want %q", status, got, want)
