@@ -22,7 +22,8 @@ pre-commit or [prek](https://prek.j178.dev) alike.
     - [Workflow lockfile (`gh-actions-lock`)](#workflow-lockfile-gh-actions-lock): hooks that run GitHub's `gh-actions-lock` CLI
       - [`gh-actions-lock-verify-local`](#gh-actions-lock-verify-local): every action has a lockfile entry (offline, on commit)
       - [`gh-actions-lock-verify`](#gh-actions-lock-verify): the lockfile matches GitHub (manual stage, for CI)
-- [`verify-commits`](#verify-commits): fail a push that sends an unsigned commit (pre-push)
+  - [Git](#git)
+    - [`verify-commits`](#verify-commits): fail a push that sends an unsigned commit (pre-push)
 - [Development](#development)
   - [Releases](#releases)
 
@@ -41,6 +42,7 @@ repos:
         args: [--arch=arm64]
       - id: gh-actions-lock-verify-local
       - id: gh-actions-lock-verify # manual stage: run in CI with GH_TOKEN
+      - id: verify-commits # pre-push stage: install with `prek install -t pre-push`
 ```
 
 > [!NOTE]
@@ -373,7 +375,11 @@ Renovate doesn't bump an override, and a repo that keeps one drifts from the
 version every other repo runs, so remove it once this repository's pin catches
 up.
 
-### `verify-commits`
+### Git
+
+These hooks check the commits in the repository rather than its files.
+
+#### `verify-commits`
 
 Fails a push that sends an unsigned commit, or one with a bad signature. It runs
 on `pre-push`, so committing unsigned (`git -c commit.gpgsign=false commit`, a
