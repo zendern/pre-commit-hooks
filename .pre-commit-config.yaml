@@ -2,7 +2,7 @@
 # pre-commit. `prek install` sets up every hook type listed below, and CI runs
 # all of them with `prek run --all-files`. Remote hooks are frozen to a commit
 # SHA with the tag in a comment (`prek autoupdate --freeze`).
-default_install_hook_types: [pre-commit, commit-msg]
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 default_stages: [pre-commit]
 
 repos:
@@ -79,6 +79,15 @@ repos:
         entry: go run ./cmd/require-runner-arch --arch=arm64
         language: system
         files: ^\.github/workflows/.*\.ya?ml$
+      # Commits here are signed; this stops an unsigned one from being pushed.
+      # pre-push only, so `prek run --all-files` (CI) doesn't run it.
+      - id: verify-commits
+        name: verify-commits (this checkout)
+        entry: go run ./cmd/verify-commits
+        language: system
+        stages: [pre-push]
+        always_run: true
+        pass_filenames: false
       # The manifest is what every consuming repo installs from, so a bad
       # entry or language breaks them all.
       - id: validate-manifest
