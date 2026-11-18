@@ -69,6 +69,7 @@ func TestRunBlocksUnsignedCommit(t *testing.T) {
 	commit(t, "a.txt", "feat: a", true)
 	commit(t, "b.txt", "feat: b", false)
 	hash := gitRun(t, "rev-parse", "--short=12", "HEAD")
+	parent := gitRun(t, "rev-parse", "--short=12", "HEAD~1")
 	t.Setenv("PRE_COMMIT_TO_REF", "HEAD")
 	var stderr bytes.Buffer
 
@@ -77,7 +78,7 @@ func TestRunBlocksUnsignedCommit(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("code %d, want 1", code)
 	}
-	for _, want := range []string{"not signed with a signature", hash + " feat: b (no signature)", "git commit --amend --no-edit -S"} {
+	for _, want := range []string{"not signed with a signature", hash + " feat: b (no signature)", "git rebase --rebase-merges --exec 'git commit --amend --no-edit -S' " + parent + "\n"} {
 		if !strings.Contains(stderr.String(), want) {
 			t.Errorf("stderr %q, want it to contain %q", stderr.String(), want)
 		}
@@ -158,5 +159,17 @@ func TestRunRejectsUnknownFlag(t *testing.T) {
 
 	if code := run([]string{"--nope"}, &stderr); code != 2 {
 		t.Fatalf("code %d, want 2", code)
+	}
+}
+
+func TestRunResignsFromRootWhenFirstCommitIsUnsigned(t *testing.T) {
+	newRepo(t)
+	commit(t, "a.txt", "feat: a", false)
+	var stderr bytes.Buffer
+
+	run(nil, &stderr)
+
+	if want := "git rebase --rebase-merges --exec 'git commit --amend --no-edit -S' --root\n"; !strings.HasSuffix(stderr.String(), want) {
+		t.Errorf("stderr %q, want it to end with %q", stderr.String(), want)
 	}
 }

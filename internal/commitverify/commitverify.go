@@ -50,6 +50,7 @@ func (s Status) Reason() string {
 // Commit is a commit that a push would send, with its signature status.
 type Commit struct {
 	Hash    string
+	Parent  string // first parent, empty for a root commit
 	Status  Status
 	Subject string
 }
@@ -66,7 +67,7 @@ type Commit struct {
 // the same as no signature, so a None commit whose raw object carries a
 // signature header is treated as Unchecked.
 func Unsigned(rev string, strict bool) ([]Commit, error) {
-	out, err := gitExec("log", "--reverse", "--format=%H%x00%G?%x00%s", rev, "--not", "--remotes")
+	out, err := gitExec("log", "--reverse", "--format=%H%x00%P%x00%G?%x00%s", rev, "--not", "--remotes")
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +78,12 @@ func Unsigned(rev string, strict bool) ([]Commit, error) {
 
 	var unsigned []Commit
 	for _, line := range strings.Split(out, "\n") {
-		fields := strings.SplitN(line, "\x00", 3)
-		if len(fields) < 3 {
+		fields := strings.SplitN(line, "\x00", 4)
+		if len(fields) < 4 {
 			return nil, fmt.Errorf("unexpected git log line %q", line)
 		}
-		hash, status := fields[0], Status(fields[1])
+		hash, status := fields[0], Status(fields[2])
+		parent, _, _ := strings.Cut(fields[1], " ")
 		if status == None {
 			signed, err := hasSignature(hash)
 			if err != nil {
@@ -92,7 +94,7 @@ func Unsigned(rev string, strict bool) ([]Commit, error) {
 			}
 		}
 		if status.fails(strict) {
-			unsigned = append(unsigned, Commit{Hash: hash, Status: status, Subject: fields[2]})
+			unsigned = append(unsigned, Commit{Hash: hash, Parent: parent, Status: status, Subject: fields[3]})
 		}
 	}
 	return unsigned, nil

@@ -408,8 +408,12 @@ Failure output
 ```
 Push blocked: these commits are not signed with a signature this hook accepts:
   adbfecc90a2e feat: b (no signature)
-Sign them: git commit --amend --no-edit -S, or for several: git rebase --exec 'git commit --amend --no-edit -S' <last pushed commit>
+Sign them on the branch being pushed: git rebase --rebase-merges --exec 'git commit --amend --no-edit -S' 4f5fb4b2c1e0
 ```
+
+The last line is a command you can run as is. It re-signs every commit from the
+oldest failing one to `HEAD`, starting at that commit's parent (or `--root`),
+and keeps merge commits.
 
 ##### Strict mode
 
@@ -434,7 +438,7 @@ in `gpg.ssh.allowedSignersFile`. For GPG, set ownertrust on each key, or put
 - pre-commit gives the hook only the first ref of a push with several refs, so
   only that ref's commits are checked.
 - Commits made before you started signing fail the first push that includes
-  them. Re-sign them with the `git rebase --exec` line in the failure output.
+  them. Re-sign them with the command in the failure output.
 
 ## Development
 

@@ -264,3 +264,38 @@ func TestUnsignedRejectsMalformedGitOutput(t *testing.T) {
 		t.Fatal("Unsigned accepted a git log line without fields, want an error")
 	}
 }
+
+func TestUnsignedRecordsFirstParent(t *testing.T) {
+	newRepo(t)
+	commit(t, "a.txt", "feat: a", false)
+	root := gitRun(t, "rev-parse", "HEAD")
+	commit(t, "b.txt", "feat: b", false)
+
+	got, err := Unsigned("HEAD", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].Parent != "" || got[1].Parent != root {
+		t.Errorf("got %+v, want a root commit with no parent, then one whose parent is %s", got, root)
+	}
+}
+
+func TestUnsignedRecordsFirstParentOfMerge(t *testing.T) {
+	newRepo(t)
+	commit(t, "a.txt", "feat: a", false)
+	gitRun(t, "checkout", "-q", "-b", "side")
+	commit(t, "b.txt", "feat: b", false)
+	gitRun(t, "checkout", "-q", "-")
+	commit(t, "c.txt", "feat: c", false)
+	first := gitRun(t, "rev-parse", "HEAD")
+	gitRun(t, "merge", "-q", "--no-edit", "side")
+
+	got, err := Unsigned("HEAD", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merge := got[len(got)-1]
+	if merge.Parent != first {
+		t.Errorf("merge parent %q, want first parent %s", merge.Parent, first)
+	}
+}

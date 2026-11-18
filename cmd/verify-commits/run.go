@@ -41,6 +41,17 @@ func run(args []string, stderr io.Writer) int {
 	for _, c := range unsigned {
 		_, _ = fmt.Fprintf(stderr, "  %s %s (%s)\n", c.Hash[:min(len(c.Hash), 12)], c.Subject, c.Status.Reason())
 	}
-	_, _ = fmt.Fprintln(stderr, "Sign them: git commit --amend --no-edit -S, or for several: git rebase --exec 'git commit --amend --no-edit -S' <last pushed commit>")
+	_, _ = fmt.Fprintf(stderr, "Sign them on the branch being pushed: %s\n", resignCommand(unsigned[0]))
 	return 1
+}
+
+// resignCommand is the rebase that re-signs every commit from oldest, the
+// oldest failing commit, to HEAD. It starts at oldest's parent, or from the
+// root when oldest has none, and keeps merges.
+func resignCommand(oldest commitverify.Commit) string {
+	base := "--root"
+	if oldest.Parent != "" {
+		base = oldest.Parent[:min(len(oldest.Parent), 12)]
+	}
+	return "git rebase --rebase-merges --exec 'git commit --amend --no-edit -S' " + base
 }
