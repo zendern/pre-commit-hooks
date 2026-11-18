@@ -377,13 +377,13 @@ up.
 
 ### Git
 
-These hooks check the commits in the repository rather than its files.
+These hooks check commits.
 
 #### `verify-commits`
 
 Fails a push that sends an unsigned commit, or one with a bad signature. It runs
-on `pre-push`, so committing unsigned (`git -c commit.gpgsign=false commit`, a
-WIP commit) still works; only the push stops.
+at `pre-push`, so you can still commit unsigned (a WIP commit, or
+`git -c commit.gpgsign=false commit`) and sign before you push.
 
 ```yaml
 default_install_hook_types: [pre-commit, pre-push]
@@ -394,28 +394,14 @@ repos:
       - id: verify-commits
 ```
 
-Run `prek install` (or `pre-commit install`) again after adding it, so git runs
+After adding it, run `prek install` (or `pre-commit install`) again so git runs
 the `pre-push` hook.
 
-It checks the commits reachable from `PRE_COMMIT_TO_REF` (or `HEAD`) that no
-remote-tracking ref has, so commits already on a remote are never checked.
-GPG and SSH signatures both count. A signature git can't check locally, such as
-an SSH signature with no `gpg.ssh.allowedSignersFile`, counts as signed: this
-hook checks that commits are signed, not who signed them. A signature git checks
-and finds wrong (`%G?` is `B`) fails.
-
-To accept only signatures git reports as good (`%G?` is `G`), pass `--strict`.
-It also fails a signature git can't check, a GPG key that is in the keyring but
-not trusted (`U`), an expired signature or key, and a revoked key. Each
-developer then needs the signers' keys trusted locally:
-`gpg.ssh.allowedSignersFile` for SSH, and for GPG ownertrust on each key (or
-`trust-model always` in `gpg.conf` to trust every key in the keyring).
-
-```yaml
-    hooks:
-      - id: verify-commits
-        args: [--strict]
-```
+The hook checks each commit the push sends that no remote-tracking ref has yet,
+so commits already on a remote are skipped. GPG and SSH signatures both count.
+By default the hook doesn't check who signed: a signature git can't check
+locally, such as an SSH signature with no `gpg.ssh.allowedSignersFile`, passes.
+A signature git checks and finds bad (`%G?` is `B`) fails.
 
 Failure output
 
@@ -425,14 +411,30 @@ Push blocked: these commits are not signed with a signature this hook accepts:
 Sign them: git commit --amend --no-edit -S, or for several: git rebase --exec 'git commit --amend --no-edit -S' <last pushed commit>
 ```
 
-Limits:
+##### Strict mode
 
-- Pushing with `--no-verify` skips it, and nothing checks on the server. Use a
-  GitHub ruleset that requires signed commits for that.
-- pre-commit passes the hook only the first ref of a multi-ref push, so only
-  that ref's commits are checked.
+With `--strict`, a commit passes only when git reports its signature as good
+(`%G?` is `G`). Signatures git can't check fail, as do GPG keys that are in the
+keyring but not trusted (`U`), expired signatures or keys, and revoked keys.
+
+```yaml
+    hooks:
+      - id: verify-commits
+        args: [--strict]
+```
+
+Every developer then needs the signers' keys trusted locally. For SSH, list them
+in `gpg.ssh.allowedSignersFile`. For GPG, set ownertrust on each key, or put
+`trust-model always` in `gpg.conf` to trust every key in the keyring.
+
+##### Limits
+
+- `git push --no-verify` skips the hook, and nothing checks on the server. A
+  GitHub ruleset that requires signed commits covers that.
+- pre-commit gives the hook only the first ref of a push with several refs, so
+  only that ref's commits are checked.
 - Commits made before you started signing fail the first push that includes
-  them.
+  them. Re-sign them with the `git rebase --exec` line in the failure output.
 
 ## Development
 
@@ -457,8 +459,9 @@ Every check lives in `.pre-commit-config.yaml` and runs on commit: file
 hygiene, zizmor, golangci-lint (with gofumpt and goimports), this repo's own
 hooks on its workflows (including the lockfile check), the manifest check, tests with a 95% coverage gate
 (`.testcoverage.yml`), `go mod tidy`, govulncheck, and go-licenses. Commit
-messages are checked against Conventional Commits. CI runs the same hooks on
-every file. Mutation testing (gremlins, 95% efficacy and mutant coverage in
+messages are checked against Conventional Commits. Pushes run
+[`verify-commits`](#verify-commits) from the checkout, so an unsigned commit
+can't be pushed. CI runs the commit hooks on every file. Mutation testing (gremlins, 95% efficacy and mutant coverage in
 `.gremlins.yaml`) is too slow for a hook: the `mutation` workflow runs it on
 the packages a PR changes, and on the whole module weekly. A tagless
 `switch { case cond: }` fails lint (`tools/lint/rules.go`), because gremlins
