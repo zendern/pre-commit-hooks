@@ -39,7 +39,7 @@ repos:
   # uses them. They are only manifest entries (no code here), which the
   # validate-manifest hook checks; Renovate bumps the rev after each release.
   - repo: https://github.com/zendern/pre-commit-hooks
-    rev: cb3feef6aa5b1864d521e8bc84acc35391146974 # frozen: v1.3.0
+    rev: 6956f01ebfdb749bca346a29cb054a2ab43fdf33 # frozen: v1.4.0
     hooks:
       - id: gh-actions-lock-verify-local
       - id: gh-actions-lock-verify
